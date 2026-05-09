@@ -25,6 +25,15 @@ export type Settings = {
   colorTextDark: string;
   colorMutedDark: string;
   colorBorderDark: string;
+  // Embeddable widget defaults (overridable per-embed via query string)
+  widgetDefaultTheme: string;        // 'auto' | 'light' | 'dark'
+  widgetDefaultLimit: string;        // integer string, e.g. '5'
+  widgetShowDate: string;            // '0' | '1'
+  widgetShowExcerpts: string;        // '0' | '1'
+  widgetMaxWidth: string;            // CSS length, e.g. '720px' or ''
+  widgetAccentOverride: string;      // hex or ''
+  widgetAllowedOrigins: string;      // comma-separated origins or '*' (informational; CSP allows all parents)
+  widgetHideWatermark: string;       // '0' show "Powered by Rubrion" pill (default), '1' hide (white-label)
 };
 
 export const SETTING_KEYS = [
@@ -48,6 +57,14 @@ export const SETTING_KEYS = [
   'colorTextDark',
   'colorMutedDark',
   'colorBorderDark',
+  'widgetDefaultTheme',
+  'widgetDefaultLimit',
+  'widgetShowDate',
+  'widgetShowExcerpts',
+  'widgetMaxWidth',
+  'widgetAccentOverride',
+  'widgetAllowedOrigins',
+  'widgetHideWatermark',
 ] as const satisfies readonly (keyof Settings)[];
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
@@ -92,6 +109,14 @@ const FALLBACKS: Settings = {
   colorTextDark: '#C8D2E6',
   colorMutedDark: '#8291AF',
   colorBorderDark: '#262B3C',
+  widgetDefaultTheme: 'auto',
+  widgetDefaultLimit: '5',
+  widgetShowDate: '1',
+  widgetShowExcerpts: '0',
+  widgetMaxWidth: '',
+  widgetAccentOverride: '',
+  widgetAllowedOrigins: '*',
+  widgetHideWatermark: '0',
 };
 
 // Optional seed-fallback env-var name for each setting. Vars may or may not be

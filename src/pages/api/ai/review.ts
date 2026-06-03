@@ -5,6 +5,11 @@ import { aiUsage, getDbInstance } from '../../../db';
 
 const MAX_INPUT_CHARS = 50_000;
 const MAX_OUTPUT_TOKENS = 8192;
+const CHARS_PER_TOKEN = 3.5;
+// Review is a rewrite — output length tracks input length. Add 30% headroom
+// for expansion, plus a small fixed buffer for short posts.
+const OUTPUT_OVERHEAD_RATIO = 1.3;
+const OUTPUT_BUFFER_TOKENS = 256;
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 const SYSTEM_PROMPT =
@@ -27,8 +32,11 @@ const json = (body: unknown, status = 200) =>
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
-const projectWorstCaseTokens = (inputChars: number): number =>
-  Math.ceil(inputChars / 3.5) + MAX_OUTPUT_TOKENS;
+const estimateInputTokens = (inputChars: number): number =>
+  Math.ceil(inputChars / CHARS_PER_TOKEN);
+
+const projectOutputTokens = (inputTokens: number): number =>
+  Math.min(MAX_OUTPUT_TOKENS, Math.ceil(inputTokens * OUTPUT_OVERHEAD_RATIO) + OUTPUT_BUFFER_TOKENS);
 
 export const POST: APIRoute = async ({ request }) => {
   const limitRaw = (env as unknown as { AI_REVIEW_DAILY_TOKEN_LIMIT?: string }).AI_REVIEW_DAILY_TOKEN_LIMIT;
@@ -64,8 +72,10 @@ export const POST: APIRoute = async ({ request }) => {
 
   const existing = await db.select().from(aiUsage).where(eq(aiUsage.day, day)).limit(1);
   const usedToday = existing[0]?.tokensUsed ?? 0;
-  const worstCase = projectWorstCaseTokens(contentMd.length);
-  if (usedToday + worstCase > limit) {
+  const inputTokens = estimateInputTokens(contentMd.length);
+  const projectedOutputTokens = projectOutputTokens(inputTokens);
+  const projectedTotal = inputTokens + projectedOutputTokens;
+  if (usedToday + projectedTotal > limit) {
     return json(
       {
         error: 'daily AI review token budget exhausted — try again tomorrow or shorten the post',
@@ -83,7 +93,7 @@ export const POST: APIRoute = async ({ request }) => {
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: contentMd },
       ],
-      max_tokens: MAX_OUTPUT_TOKENS,
+      max_tokens: projectedOutputTokens,
     })) as AiTextResponse;
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : 'Workers AI error' }, 502);
@@ -99,7 +109,7 @@ export const POST: APIRoute = async ({ request }) => {
     usage?.total_tokens ??
     (usage?.prompt_tokens != null || usage?.completion_tokens != null
       ? (usage.prompt_tokens ?? 0) + (usage.completion_tokens ?? 0)
-      : worstCase);
+      : projectedTotal);
 
   await db
     .insert(aiUsage)

@@ -8,9 +8,21 @@ EdgePress whitelabels on a single Cloudflare account.
 Each tenant has its own D1 database, so each tenant gets its own
 `ai_usage` row counter. The cap (`AI_REVIEW_DAILY_TOKEN_LIMIT`) lives in
 that tenant's `wrangler.jsonc` `vars` block. The route reads today's
-`tokens_used` from D1, projects the worst-case cost of the incoming call
-(`ceil(input_chars / 3.5) + max_output_tokens`), and rejects with 429 if
-the projection would push past the cap.
+`tokens_used` from D1, projects the cost of the incoming call (input
+tokens + a scaled output budget tracking the input length), and rejects
+with 429 if the projection would push past the cap.
+
+The projection formula is:
+
+```
+input_tokens  = ceil(input_chars / 3.5)
+output_tokens = min(MAX_OUTPUT_TOKENS, ceil(input_tokens * 1.3) + 256)
+projected     = input_tokens + output_tokens
+```
+
+Output isn't reserved at the full `MAX_OUTPUT_TOKENS` ceiling because a
+review rewrite is roughly the same length as its input — reserving 8192
+tokens for a 200-char post would 429 every request on any cap under 8k.
 
 That gives you a hard per-tenant ceiling. The next layer up — your
 **Cloudflare account's daily neuron budget** — is shared across every
@@ -54,24 +66,23 @@ a 5,000-token cap = ~2–10 reviews/day; a 25,000-token cap = ~10–50.
 
 ## Per-call worst case
 
-`MAX_INPUT_CHARS = 50_000` and `max_tokens = 8192` in `review.ts`. Worst
-case for a single call:
+`MAX_INPUT_CHARS = 50_000` in `review.ts`, with the scaled output budget
+above. Worst case for a single call is a 50k-char post:
 
 ```
-ceil(50_000 / 3.5) + 8192 ≈ 22_478 tokens
+input_tokens  = ceil(50_000 / 3.5)              ≈ 14_286
+output_tokens = min(8192, ceil(14_286 * 1.3) + 256) = 8_192
+projected     ≈ 22_478 tokens
 ```
 
 So any per-tenant cap below ~23k tokens means a single 50k-char post
-*will* be rejected even on a fresh-day quota. That's intentional — it
-forces clients submitting giant posts to either edit smaller chunks or
-ask you to raise their cap. It also means your **floor for the cap**
-should be ≥ 23k if you want every legal request to be servable on a
-fresh day; below that you're rate-limiting by post size as well as by
-volume.
+*will* be rejected even on a fresh-day quota. Smaller posts scale down
+linearly — e.g. a 2k-char post projects to ~570 input + ~1024 output ≈
+1,594 tokens, so an 8k cap fits ~5 such reviews/day.
 
-If you don't want big posts to be hard-blocked, lower `MAX_INPUT_CHARS`
-or raise the cap. Don't ship caps in the 5k–22k range unless you're OK
-with the "giant post is impossible" tradeoff.
+To allow giant posts on a fresh day, raise the cap to ≥ 23k or lower
+`MAX_INPUT_CHARS`. Caps in the 5k–22k range hard-block 50k-char posts
+by design.
 
 ## How to actually pick a number
 

@@ -1,8 +1,8 @@
-import type { APIRoute } from 'astro';
+import type { APIRoute } from "astro";
 
 const SCRIPT = `(function(){
-  if (window.__edgepressResizerInstalled) return;
-  window.__edgepressResizerInstalled = true;
+  if (window.__edgeletterResizerInstalled) return;
+  window.__edgeletterResizerInstalled = true;
   function findFrame(source){
     var frames = document.querySelectorAll('iframe');
     for (var i = 0; i < frames.length; i++) {
@@ -13,7 +13,7 @@ const SCRIPT = `(function(){
   window.addEventListener('message', function(ev){
     var data = ev && ev.data;
     if (!data || typeof data !== 'object') return;
-    if (data.type !== 'edgepress:resize') return;
+    if (data.type !== 'edgeletter:resize') return;
     var h = Number(data.height);
     if (!isFinite(h) || h <= 0) return;
     var frame = findFrame(ev.source);
@@ -26,9 +26,9 @@ export const GET: APIRoute = () => {
   return new Response(SCRIPT, {
     status: 200,
     headers: {
-      'Content-Type': 'application/javascript; charset=utf-8',
-      'Cache-Control': 'public, max-age=300, s-maxage=3600',
-      'Access-Control-Allow-Origin': '*',
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "public, max-age=300, s-maxage=3600",
+      "Access-Control-Allow-Origin": "*",
     },
   });
 };

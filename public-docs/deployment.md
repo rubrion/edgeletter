@@ -11,7 +11,7 @@ bun install
 ### 2. Create the D1 database
 
 ```sh
-bunx wrangler d1 create <tenant>-edgepress
+bunx wrangler d1 create <tenant>-edgeletter
 ```
 
 Copy the returned `database_id` into `wrangler.jsonc`:
@@ -20,7 +20,7 @@ Copy the returned `database_id` into `wrangler.jsonc`:
 "d1_databases": [
   {
     "binding": "DB",
-    "database_name": "<tenant>-edgepress",
+    "database_name": "<tenant>-edgeletter",
     "database_id": "<paste-here>",
     "migrations_dir": "./drizzle"
   }
@@ -35,7 +35,7 @@ Copy the returned `database_id` into `wrangler.jsonc`:
 bunx wrangler r2 bucket create <your-bucket>
 ```
 
-One bucket can be shared across all tenants — uploads land under `edgepress/<CLIENT_SLUG>/...` so each tenant has its own folder.
+One bucket can be shared across all tenants — uploads land under `edgeletter/<CLIENT_SLUG>/...` so each tenant has its own folder.
 
 ### 4. Set tenant `vars` in `wrangler.jsonc`
 
@@ -58,8 +58,8 @@ One bucket can be shared across all tenants — uploads land under `edgepress/<C
 ### 5. Apply database migrations
 
 ```sh
-bunx wrangler d1 migrations apply <tenant>-edgepress --local   # local
-bunx wrangler d1 migrations apply <tenant>-edgepress --remote  # production
+bunx wrangler d1 migrations apply <tenant>-edgeletter --local   # local
+bunx wrangler d1 migrations apply <tenant>-edgeletter --remote  # production
 ```
 
 To regenerate the SQL after a schema change: `bun run db:generate`.

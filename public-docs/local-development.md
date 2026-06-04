@@ -1,7 +1,7 @@
 # Local Development
 
 ```sh
-bunx wrangler d1 migrations apply <tenant>-edgepress --local   # one-time
+bunx wrangler d1 migrations apply <tenant>-edgeletter --local   # one-time
 bun run dev                                                    # http://localhost:4321
 ```
 
@@ -15,7 +15,7 @@ curl -X POST http://localhost:4321/api/subscribe \
   -d '{"email":"me@test.com"}'
 # → {"ok":true}
 
-bunx wrangler d1 execute <tenant>-edgepress --local \
+bunx wrangler d1 execute <tenant>-edgeletter --local \
   --command "SELECT email, status FROM subscribers"
 ```
 

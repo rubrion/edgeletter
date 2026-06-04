@@ -1,6 +1,6 @@
-# EdgePress—the high-performance publishing engine
+# EdgeLetter—the high-performance publishing engine
 
-EdgePress is a single Cloudflare Worker (Astro SSR + D1 + R2) that runs the public blog, the admin editor, the media uploader, and the newsletter dispatcher. Each white-label tenant gets **one Worker deployment + one D1 database**, with all brand visuals configured live via an admin panel — no redeploy required.
+EdgeLetter is a single Cloudflare Worker (Astro SSR + D1 + R2) that runs the public blog, the admin editor, the media uploader, and the newsletter dispatcher. Each white-label tenant gets **one Worker deployment + one D1 database**, with all brand visuals configured live via an admin panel — no redeploy required.
 
 Email goes out via one of two providers, selected per-tenant:
 
@@ -10,7 +10,7 @@ Email goes out via one of two providers, selected per-tenant:
 
 ## See it in Action
 
-Experience EdgePress live: **[edgepress.rubrion.ai](https://edgepress.rubrion.ai/)**
+Experience EdgeLetter live: **[edgeletter.rubrion.ai](https://edgeletter.rubrion.ai/)**
 
 ## Work with Us
 
@@ -34,7 +34,7 @@ Want this platform customized and deployed for your business? We offer end-to-en
 
 - All public pages, the admin UI, `/api/*`, and media uploads run inside one Worker.
 - D1 holds `posts`, `subscribers`, `campaigns`, `settings` (schema in [`src/db/schema.ts`](./src/db/schema.ts)).
-- R2 holds uploaded images and videos, organized as `edgepress/<CLIENT_SLUG>/<yyyy-mm>/<uuid>.<ext>`. One bucket can be shared across tenants — slug-prefixed paths keep them isolated.
+- R2 holds uploaded images and videos, organized as `edgeletter/<CLIENT_SLUG>/<yyyy-mm>/<uuid>.<ext>`. One bucket can be shared across tenants — slug-prefixed paths keep them isolated.
 - Brand visuals (name, tagline, logo, favicon, theme color, email From-address) live in D1 and are editable from `/admin/settings` without redeploy.
 - Provider choice is a config flip (`EMAIL_PROVIDER` var); no code changes.
 
@@ -79,7 +79,7 @@ bun install
 ### 2. Create the D1 database
 
 ```sh
-bunx wrangler d1 create <tenant>-edgepress
+bunx wrangler d1 create <tenant>-edgeletter
 ```
 
 Copy the returned `database_id` into `wrangler.jsonc`:
@@ -88,7 +88,7 @@ Copy the returned `database_id` into `wrangler.jsonc`:
 "d1_databases": [
   {
     "binding": "DB",
-    "database_name": "<tenant>-edgepress",
+    "database_name": "<tenant>-edgeletter",
     "database_id": "<paste-here>",
     "migrations_dir": "./drizzle"
   }
@@ -107,7 +107,7 @@ bunx wrangler r2 bucket create <your-bucket>
 # via the Cloudflare dashboard → R2 → Bucket → Settings → Connect Domain.
 ```
 
-One bucket can be shared across all whitelabel tenants — uploads land under `edgepress/<CLIENT_SLUG>/...` so each tenant has its own folder.
+One bucket can be shared across all whitelabel tenants — uploads land under `edgeletter/<CLIENT_SLUG>/...` so each tenant has its own folder.
 
 ### 4. Set tenant `vars` in `wrangler.jsonc`
 
@@ -133,10 +133,10 @@ Only **infrastructure** and **build-time** vars live here. Brand visuals are man
 
 ```sh
 # Local (creates .wrangler/state/v3/d1/...)
-bunx wrangler d1 migrations apply <tenant>-edgepress --local
+bunx wrangler d1 migrations apply <tenant>-edgeletter --local
 
 # Remote (production)
-bunx wrangler d1 migrations apply <tenant>-edgepress --remote
+bunx wrangler d1 migrations apply <tenant>-edgeletter --remote
 ```
 
 This creates `posts`, `subscribers`, `campaigns`, and `settings` tables.
@@ -184,7 +184,7 @@ That's it. No second container to host.
 
 ## Configuration reference
 
-EdgePress splits configuration into three layers, each with a different lifecycle:
+EdgeLetter splits configuration into three layers, each with a different lifecycle:
 
 ### Admin-managed (D1 `settings` table) — change anytime, no redeploy
 
@@ -211,7 +211,7 @@ Resolution at request time: **DB row → `wrangler.jsonc` seed → hard-coded de
 | Var | Required when | Purpose |
 | --- | ------------- | ------- |
 | `CLIENT_DOMAIN` | always | Canonical URLs, sitemap, default Resend `from` (`noreply@$CLIENT_DOMAIN`), Astro `site` URL |
-| `CLIENT_SLUG` | always (R2 uploads) | Folder name under `edgepress/` in the media bucket. Keeps tenant uploads isolated |
+| `CLIENT_SLUG` | always (R2 uploads) | Folder name under `edgeletter/` in the media bucket. Keeps tenant uploads isolated |
 | `CLIENT_FONT` | optional | Google Font family name (e.g. `Inter`, `Playfair Display`). Read at **build time** |
 | `MEDIA_PUBLIC_BASE` | always (R2 uploads) | Public base URL of the R2 bucket (e.g. `https://media.example.com`). Used to build asset URLs after upload |
 | `EMAIL_PROVIDER` | always | `RESEND` or `GMAIL` |
@@ -251,7 +251,7 @@ GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
 ## Local development
 
 ```sh
-bunx wrangler d1 migrations apply <tenant>-edgepress --local   # one-time
+bunx wrangler d1 migrations apply <tenant>-edgeletter --local   # one-time
 bun run dev                                                    # http://localhost:4321
 ```
 
@@ -265,7 +265,7 @@ curl -X POST http://localhost:4321/api/subscribe \
   -d '{"email":"me@test.com"}'
 # → {"ok":true}
 
-bunx wrangler d1 execute <tenant>-edgepress --local \
+bunx wrangler d1 execute <tenant>-edgeletter --local \
   --command "SELECT email, status FROM subscribers"
 ```
 
@@ -302,7 +302,7 @@ For Resend, three DNS records on `$CLIENT_DOMAIN` are required for emails to lan
 
 Add them in your Resend dashboard → Domains → Add domain → follow instructions. Without DKIM/SPF, Gmail / Outlook will reject or spam-fold messages even if everything else is configured correctly.
 
-EdgePress already sends the headers Gmail's bulk-sender policy requires (`List-Unsubscribe`, `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, plain-text alternative).
+EdgeLetter already sends the headers Gmail's bulk-sender policy requires (`List-Unsubscribe`, `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, plain-text alternative).
 
 ---
 

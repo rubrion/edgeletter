@@ -1,6 +1,6 @@
 # Architecture
 
-EdgePress runs entirely inside a single Cloudflare Worker. There is no separate container or server to manage.
+EdgeLetter runs entirely inside a single Cloudflare Worker. There is no separate container or server to manage.
 
 ```
                     ┌─RESEND─▶ api.resend.com (HTTPS)
@@ -12,7 +12,7 @@ EdgePress runs entirely inside a single Cloudflare Worker. There is no separate 
 
 - All public pages, the admin UI, `/api/*`, and media uploads run inside one Worker.
 - D1 holds `posts`, `subscribers`, `campaigns`, `settings` (schema in `src/db/schema.ts`).
-- R2 holds uploaded images and videos, organized as `edgepress/<CLIENT_SLUG>/<yyyy-mm>/<uuid>.<ext>`. One bucket can be shared across tenants — slug-prefixed paths keep them isolated.
+- R2 holds uploaded images and videos, organized as `edgeletter/<CLIENT_SLUG>/<yyyy-mm>/<uuid>.<ext>`. One bucket can be shared across tenants — slug-prefixed paths keep them isolated.
 - Brand visuals (name, tagline, logo, favicon, theme color, email From-address) live in D1 and are editable from `/admin/settings` without redeploy.
 - Provider choice is a config flip (`EMAIL_PROVIDER` var); no code changes.
 

@@ -50,7 +50,7 @@ const langLabel = lang === 'en' ? 'PT' : 'EN';
   themeBtn.addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
-    localStorage.setItem('edgepress-theme', next);
+    localStorage.setItem('edgeletter-theme', next);
     syncTheme();
   });
   syncTheme();

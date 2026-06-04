@@ -1,6 +1,6 @@
 # Email Providers
 
-EdgePress supports two email providers, selected per-tenant. Switching providers is a config-only change — no code edits, no infra moves.
+EdgeLetter supports two email providers, selected per-tenant. Switching providers is a config-only change — no code edits, no infra moves.
 
 ## Switching providers
 
@@ -25,7 +25,7 @@ For Resend, three DNS records on `$CLIENT_DOMAIN` are required for emails to lan
 
 Add them in your Resend dashboard → Domains → Add domain.
 
-EdgePress already sends the headers Gmail's bulk-sender policy requires (`List-Unsubscribe`, `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, plain-text alternative).
+EdgeLetter already sends the headers Gmail's bulk-sender policy requires (`List-Unsubscribe`, `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, plain-text alternative).
 
 ## Operational notes
 

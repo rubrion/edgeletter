@@ -1,6 +1,6 @@
 # Configuration Reference
 
-EdgePress splits configuration into three layers, each with a different lifecycle.
+EdgeLetter splits configuration into three layers, each with a different lifecycle.
 
 ## Admin-managed (D1 `settings` table) — change anytime, no redeploy
 
@@ -20,7 +20,7 @@ Resolution at request time: **DB row → `wrangler.jsonc` seed → hard-coded de
 | Var | Required when | Purpose |
 | --- | ------------- | ------- |
 | `CLIENT_DOMAIN` | always | Canonical URLs, sitemap, default Resend `from` (`noreply@$CLIENT_DOMAIN`), Astro `site` URL |
-| `CLIENT_SLUG` | always | Folder name under `edgepress/` in the media bucket. Keeps tenant uploads isolated |
+| `CLIENT_SLUG` | always | Folder name under `edgeletter/` in the media bucket. Keeps tenant uploads isolated |
 | `CLIENT_FONT` | optional | Google Font family name (e.g. `Inter`, `Playfair Display`). Read at **build time** |
 | `MEDIA_PUBLIC_BASE` | always | Public base URL of the R2 bucket. Used to build asset URLs after upload |
 | `EMAIL_PROVIDER` | always | `RESEND` or `GMAIL` |

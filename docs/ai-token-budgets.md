@@ -1,7 +1,7 @@
 # AI review token budgets
 
 How to size `AI_REVIEW_DAILY_TOKEN_LIMIT` per tenant when running multiple
-EdgePress whitelabels on a single Cloudflare account.
+EdgeLetter whitelabels on a single Cloudflare account.
 
 ## How the budget works
 
@@ -36,7 +36,7 @@ the boundary, not the worker, the binding, or the namespace.
 
 Neurons aren't tokens. The conversion varies by model, precision, and
 batch behaviour, and Cloudflare doesn't publish a fixed table. For
-`@cf/meta/llama-3.3-70b-instruct-fp8-fast` (what EdgePress uses), a
+`@cf/meta/llama-3.3-70b-instruct-fp8-fast` (what EdgeLetter uses), a
 practical rule of thumb is **~3–10 tokens per neuron**, meaning
 **roughly 30k–100k tokens/day** of total throughput on the free tier
 across the entire account.
@@ -103,7 +103,7 @@ this doc are educated guesses to start from.
   account that calls `env.AI.run(...)` shares the 10k neurons/day pool
   and isn't tracked by `ai_usage`. If you have other projects, factor
   their usage in.
-- **Other Workers AI models invoked from EdgePress.** The counter is
+- **Other Workers AI models invoked from EdgeLetter.** The counter is
   global across `review.ts` calls but doesn't distinguish models. If
   you ever add another AI route, either share the counter (same
   semantics) or give it its own table + env var.

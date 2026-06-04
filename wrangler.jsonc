@@ -1,48 +1,54 @@
 {
-  "compatibility_date": "2026-04-29",
-  "compatibility_flags": [
-    "global_fetch_strictly_public"
-  ],
-  "name": "web-rubrion-edgepress",
-  "main": "@astrojs/cloudflare/entrypoints/server",
-  "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS",
-  },
-  "observability": {
-    "enabled": true,
-  },
-  "routes": [
-    {
-      "pattern": "edgepress.rubrion.ai",
-      "custom_domain": true
-    }
-  ],
-  "vars": {
-    "CLIENT_DOMAIN": "edgepress.rubrion.ai",
-    "CLIENT_SLUG": "rubrion",
-    "CLIENT_FONT": "Fira Sans",
-    "MEDIA_PUBLIC_BASE": "https://media.rubrion.ai",
-    "EMAIL_PROVIDER": "RESEND",
-    "EMAIL_FROM_DOMAIN": "rubrion.ai",
-    "AI_REVIEW_DAILY_TOKEN_LIMIT": "8000",
-    "TURNSTILE_SITE_KEY": "0x4AAAAAADMKgjDCOeL0zVJj"
-  },
-  "ai": {
-    "binding": "AI",
-  },
-  "r2_buckets": [
-    {
-      "binding": "MEDIA",
-      "bucket_name": "rubrion",
-    },
-  ],
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "rubrion-edgepress",
-      "database_id": "f2d705ed-73cc-45e6-9e99-2bd735858b90",
-      "migrations_dir": "./drizzle",
-    },
-  ],
+	"compatibility_date": "2026-04-29",
+	"compatibility_flags": [
+		"global_fetch_strictly_public"
+	],
+	"name": "web-rubrion-edgeletter",
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS",
+	},
+	"observability": {
+		"enabled": true,
+	},
+	"routes": [
+		{
+			"pattern": "edgeletter.rubrion.ai",
+			"custom_domain": true,
+		},
+	],
+	"vars": {
+		"CLIENT_DOMAIN": "edgeletter.rubrion.ai",
+		"CLIENT_SLUG": "rubrion",
+		"CLIENT_FONT": "Fira Sans",
+		"MEDIA_PUBLIC_BASE": "https://media.rubrion.ai",
+		"EMAIL_PROVIDER": "RESEND",
+		"EMAIL_FROM_DOMAIN": "rubrion.ai",
+		"AI_REVIEW_DAILY_TOKEN_LIMIT": "8000",
+		"TURNSTILE_SITE_KEY": "0x4AAAAAADMKgjDCOeL0zVJj",
+	},
+	"ai": {
+		"binding": "AI",
+	},
+	"r2_buckets": [
+		{
+			"binding": "MEDIA",
+			"bucket_name": "rubrion",
+		},
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "rubrion-edgeletter",
+			"database_id": "02fed011-4f3d-4796-949a-6a9def359f3a",
+			"migrations_dir": "./drizzle",
+		},
+		{
+			"binding": "rubrion_edgeletter",
+			"database_name": "rubrion-edgeletter",
+			"database_id": "02fed011-4f3d-4796-949a-6a9def359f3a",
+			"remote": true
+		},
+	],
 }

@@ -175,7 +175,7 @@ const dataTheme = themeMode === 'auto' ? null : themeMode;
       )}
       {showWatermark && (
         <div class="ep-wm-row">
-          <a class="ep-wm" href="https://rubrion.ai/?utm_source=edgepress-widget"
+          <a class="ep-wm" href="https://rubrion.ai/?utm_source=edgeletter-widget"
              target="_blank" rel="noopener nofollow"
              aria-label="Powered by Rubrion">
             <img src="https://media.rubrion.ai/images/logo_rubrion_ver4_white.svg"
@@ -189,7 +189,7 @@ const dataTheme = themeMode === 'auto' ? null : themeMode;
     <script>
       const report = () => {
         const h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
-        try { parent.postMessage({ type: 'edgepress:resize', height: h }, '*'); } catch {}
+        try { parent.postMessage({ type: 'edgeletter:resize', height: h }, '*'); } catch {}
       };
       window.addEventListener('load', report);
       const ro = new ResizeObserver(report);

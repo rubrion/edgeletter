@@ -59,7 +59,7 @@ const articleJsonLd =
 <!-- Runs before first paint to set theme without flash -->
 <script is:inline>
   (function () {
-    var saved = localStorage.getItem('edgepress-theme');
+    var saved = localStorage.getItem('edgeletter-theme');
     var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.dataset.theme = saved || (prefersDark ? 'dark' : 'light');
   })();

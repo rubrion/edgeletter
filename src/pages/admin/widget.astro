@@ -268,7 +268,7 @@ const turnstileEnabled =
         '<iframe src="' + url + '"\n        ' +
         'style="width:' + w + ';' + styleH + 'border:0;display:block"\n        ' +
         'width="' + w + '" height="' + heightAttr + '" loading="lazy" referrerpolicy="no-referrer-when-downgrade"\n        ' +
-        'title="Blog by ' + (document.title.replace(/—.*$/, '').trim() || 'EdgePress') + '"></iframe>\n' +
+        'title="Blog by ' + (document.title.replace(/—.*$/, '').trim() || 'EdgeLetter') + '"></iframe>\n' +
         '<script src="' + publicOrigin + '/embed/resizer.js" async><\/script>';
       $('snippet').textContent = snippet;
       const preview = $('preview');
@@ -339,7 +339,7 @@ const turnstileEnabled =
     // Auto-resize preview iframe via the same postMessage protocol.
     window.addEventListener('message', (ev) => {
       const d = ev?.data;
-      if (!d || d.type !== 'edgepress:resize') return;
+      if (!d || d.type !== 'edgeletter:resize') return;
       const f = $('preview');
       if (f && ev.source === f.contentWindow) {
         f.style.height = Math.max(120, Number(d.height) || 0) + 'px';

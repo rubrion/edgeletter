@@ -43,6 +43,8 @@ Resolution at request time: **DB row → `wrangler.jsonc` seed → hard-coded de
 | `RESEND_API_KEY` | `EMAIL_PROVIDER=RESEND` | Resend API key (`re_...`) |
 | `GMAIL_USER` | `EMAIL_PROVIDER=GMAIL` | Gmail address. Used as both SMTP login and the `From:` address |
 | `GMAIL_APP_PASSWORD` | `EMAIL_PROVIDER=GMAIL` | [Gmail App Password](https://support.google.com/accounts/answer/185833) |
+| `TURNSTILE_SECRET` | optional | Turnstile secret for the widget in `TURNSTILE_SITE_KEY`. When set, `/api/subscribe` requires a valid token |
+| `SUBSCRIBE_API_KEY` | optional | Lets your own site subscribe visitors server-to-server: send it as `x-subscribe-key` to `/api/subscribe` and the Turnstile check is skipped (your site runs its own). Same list, double opt-in and dispatch |
 
 ## Local development (`.dev.vars`)
 

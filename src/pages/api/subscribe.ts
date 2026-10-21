@@ -8,6 +8,20 @@ import { isTurnstileEnabled, verifyTurnstile } from '../../lib/turnstile';
 import { sendConfirmationEmail } from '../../lib/confirm-email';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Constant-time check of the x-subscribe-key header against SUBSCRIBE_API_KEY:
+ * verify() succeeds only if HMAC(key) equals HMAC(secret), i.e. key === secret.
+ */
+async function isTrustedCaller(key: string | null): Promise<boolean> {
+  const secret = (env as unknown as { SUBSCRIBE_API_KEY?: string }).SUBSCRIBE_API_KEY;
+  if (!secret || !key) return false;
+  const enc = new TextEncoder();
+  const hmac = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+  const expected = await crypto.subtle.sign('HMAC', hmac, enc.encode(secret));
+  return crypto.subtle.verify('HMAC', hmac, expected, enc.encode(key));
+}
+
 const CONFIRM_TTL_MS = 24 * 60 * 60 * 1000;
 
 const json = (
@@ -64,7 +78,12 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ error: 'invalid email' }, 400, cors);
   }
 
-  if (isTurnstileEnabled(env)) {
+  // A trusted server (the tenant's own site, which ran its own captcha) can
+  // subscribe on a visitor's behalf with SUBSCRIBE_API_KEY, so a custom form
+  // still lands here: same list, same double opt-in, same dispatch.
+  const trusted = await isTrustedCaller(request.headers.get('x-subscribe-key'));
+
+  if (!trusted && isTurnstileEnabled(env)) {
     const remoteIp =
       request.headers.get('cf-connecting-ip') ??
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??

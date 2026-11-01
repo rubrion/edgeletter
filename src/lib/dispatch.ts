@@ -5,7 +5,7 @@ import { loadSettings, type Settings } from './settings';
 
 type DispatchArgs = {
   env: Env;
-  post: Pick<Post, 'title' | 'slug' | 'contentHtml'>;
+  post: Pick<Post, 'title' | 'slug' | 'contentHtml' | 'lang' | 'canonicalUrl'>;
   subscribers: Pick<Subscriber, 'id' | 'email'>[];
 };
 
@@ -46,7 +46,7 @@ const sendViaResend = async ({
 }: {
   env: Env;
   settings: Settings;
-  post: Pick<Post, 'title' | 'slug' | 'contentHtml'>;
+  post: Pick<Post, 'title' | 'slug' | 'contentHtml' | 'lang' | 'canonicalUrl'>;
   subscribers: Pick<Subscriber, 'id' | 'email'>[];
 }): Promise<{ sent: number; failed: number }> => {
   const e = env as unknown as { RESEND_API_KEY?: string };
@@ -66,8 +66,9 @@ const sendViaResend = async ({
         clientDomain,
         themeColor: settings.themePrimaryColor,
         postTitle: post.title,
-        postSlug: post.slug,
+        postUrl: post.canonicalUrl ?? `https://${clientDomain}/blog/${post.slug}`,
         postHtml: post.contentHtml,
+        lang: post.lang,
         unsubscribeUrl,
       });
 
@@ -106,7 +107,7 @@ const sendViaGmail = async ({
 }: {
   env: Env;
   settings: Settings;
-  post: Pick<Post, 'title' | 'slug' | 'contentHtml'>;
+  post: Pick<Post, 'title' | 'slug' | 'contentHtml' | 'lang' | 'canonicalUrl'>;
   subscribers: Pick<Subscriber, 'id' | 'email'>[];
 }): Promise<{ sent: number; failed: number }> => {
   const e = env as unknown as { GMAIL_USER?: string; GMAIL_APP_PASSWORD?: string };
@@ -125,8 +126,9 @@ const sendViaGmail = async ({
       clientDomain,
       themeColor: settings.themePrimaryColor,
       postTitle: post.title,
-      postSlug: post.slug,
+      postUrl: post.canonicalUrl ?? `https://${clientDomain}/blog/${post.slug}`,
       postHtml: post.contentHtml,
+      lang: post.lang,
       unsubscribeUrl,
     });
     try {

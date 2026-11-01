@@ -27,6 +27,6 @@ const description = post.contentMd
 	.slice(0, 160);
 ---
 
-<BlogPost title={post.title} description={description} pubDate={post.publishedAt}>
+<BlogPost title={post.title} description={description} pubDate={post.publishedAt} canonical={post.canonicalUrl ?? undefined} lang={post.lang === 'pt' ? 'pt-BR' : 'en'}>
 	<Fragment set:html={post.contentHtml} />
 </BlogPost>

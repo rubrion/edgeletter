@@ -48,11 +48,13 @@ export const POST: APIRoute = async ({ request }) => {
   let email: string | undefined;
   let turnstileToken: string | null = null;
   let honeypot: string | null = null;
+  let lang: 'en' | 'pt' = 'en';
   const ct = request.headers.get('content-type') ?? '';
   try {
     if (ct.includes('application/json')) {
-      const body = (await request.json()) as { email?: string; turnstile?: string; website?: string };
+      const body = (await request.json()) as { email?: string; turnstile?: string; website?: string; lang?: string };
       email = body.email;
+      if (body.lang === 'pt') lang = 'pt';
       turnstileToken = body.turnstile ?? null;
       honeypot = body.website ?? null;
     } else {
@@ -61,6 +63,7 @@ export const POST: APIRoute = async ({ request }) => {
       if (typeof v === 'string') email = v;
       const t = form.get('cf-turnstile-response') ?? form.get('turnstile');
       if (typeof t === 'string') turnstileToken = t;
+      if (form.get('lang') === 'pt') lang = 'pt';
       const hp = form.get('website');
       if (typeof hp === 'string') honeypot = hp;
     }
@@ -118,6 +121,7 @@ export const POST: APIRoute = async ({ request }) => {
         status: 'pending',
         confirmToken: token,
         confirmTokenExpiresAt: expires,
+        lang,
       })
       .where(eq(subscribers.email, email));
   } else {
@@ -126,12 +130,13 @@ export const POST: APIRoute = async ({ request }) => {
       status: 'pending',
       confirmToken: token,
       confirmTokenExpiresAt: expires,
+      lang,
     });
   }
 
   const confirmUrl = `${origin}/api/subscribe/confirm?token=${token}`;
   try {
-    await sendConfirmationEmail({ env, settings, to: email, confirmUrl });
+    await sendConfirmationEmail({ env, settings, to: email, confirmUrl, lang });
   } catch (err) {
     // Don't leak the address back if email fails — caller will retry.
     const msg = err instanceof Error ? err.message : String(err);

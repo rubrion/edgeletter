@@ -11,6 +11,14 @@ type PublishBody = {
   slug: string;
   content_md: string;
   publish: boolean;
+  /** 'en' (default) or 'pt': who it's sent to. */
+  lang?: string;
+  /** The post's home when it's synced from another site. */
+  canonical_url?: string;
+  /** ISO date to stamp as published (a synced post keeps its real date). */
+  published_at?: string;
+  /** false: publish without emailing anyone (importing old posts). */
+  send?: boolean;
 };
 
 const slugify = (s: string): string =>
@@ -35,6 +43,9 @@ export const POST: APIRoute = async ({ request }) => {
     return Response.json({ error: 'title, slug, content_md required' }, { status: 400 });
   }
   const contentHtml = await marked.parse(contentMd, { async: true });
+  const lang = body.lang === 'pt' ? 'pt' : 'en';
+  const canonicalUrl = /^https:\/\//.test(body.canonical_url ?? '') ? body.canonical_url! : null;
+  const stamped = body.published_at && !Number.isNaN(Date.parse(body.published_at)) ? new Date(body.published_at) : null;
 
   const db = getDbInstance();
 
@@ -42,17 +53,20 @@ export const POST: APIRoute = async ({ request }) => {
   if (body.id) {
     [existing] = await db.select().from(posts).where(eq(posts.id, body.id)).limit(1);
     if (!existing) return Response.json({ error: 'post not found' }, { status: 404 });
+  } else {
+    // No id: a sync matches the post by its slug, so running it again updates instead of duplicating.
+    [existing] = await db.select().from(posts).where(eq(posts.slug, slug)).limit(1);
   }
 
   // Has a successful campaign already gone out? If so, never re-send.
-  const priorCampaign = body.id
+  const priorCampaign = existing
     ? (
         await db
           .select()
           .from(campaigns)
           .where(
             and(
-              eq(campaigns.postId, body.id),
+              eq(campaigns.postId, existing.id),
               inArray(campaigns.status, ['sent', 'partial']),
             ),
           )
@@ -73,8 +87,11 @@ export const POST: APIRoute = async ({ request }) => {
         slug,
         contentMd,
         contentHtml,
+        lang,
+        canonicalUrl,
+        ...(stamped ? { publishedAt: stamped } : {}),
         ...(transitioningToPublished
-          ? { isPublished: true, publishedAt: new Date() }
+          ? { isPublished: true, publishedAt: stamped ?? new Date() }
           : body.publish
             ? { isPublished: true }
             : {}),
@@ -90,14 +107,17 @@ export const POST: APIRoute = async ({ request }) => {
         slug,
         contentMd,
         contentHtml,
+        lang,
+        canonicalUrl,
         isPublished: body.publish,
-        publishedAt: body.publish ? new Date() : null,
+        publishedAt: body.publish ? (stamped ?? new Date()) : null,
       })
       .returning();
     saved = inserted!;
   }
 
-  if (!body.publish) {
+  // A sync (no id) that only updates an already published post never emails.
+  if (!body.publish || body.send === false || (!body.id && !transitioningToPublished)) {
     return Response.json({ post: saved, campaign: null, dispatch: null, alreadySent: false });
   }
 
@@ -113,7 +133,7 @@ export const POST: APIRoute = async ({ request }) => {
   const activeSubs = await db
     .select({ id: subscribers.id, email: subscribers.email })
     .from(subscribers)
-    .where(eq(subscribers.status, 'active'));
+    .where(and(eq(subscribers.status, 'active'), eq(subscribers.lang, saved.lang)));
 
   let dispatchResult;
   try {

@@ -14,6 +14,8 @@ export const subscribers = sqliteTable('subscribers', {
   confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }),
   confirmToken: text('confirm_token'),
   confirmTokenExpiresAt: integer('confirm_token_expires_at', { mode: 'timestamp_ms' }),
+  /** The language they signed up in: they get only posts in it. */
+  lang: text('lang', { enum: ['en', 'pt'] }).notNull().default('en'),
 });
 
 export const posts = sqliteTable('posts', {
@@ -26,6 +28,10 @@ export const posts = sqliteTable('posts', {
   contentMd: text('content_md').notNull(),
   isPublished: integer('is_published', { mode: 'boolean' }).notNull().default(false),
   publishedAt: integer('published_at', { mode: 'timestamp_ms' }),
+  /** Sent only to subscribers in this language. */
+  lang: text('lang', { enum: ['en', 'pt'] }).notNull().default('en'),
+  /** Where the post really lives when it's synced from another site; emails and the page link there. */
+  canonicalUrl: text('canonical_url'),
 });
 
 export const campaigns = sqliteTable('campaigns', {

@@ -21,6 +21,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   const masterKey = (env as unknown as { MASTER_ADMIN_KEY?: string }).MASTER_ADMIN_KEY;
   if (isAdminAuthed(request, cookies, masterKey)) return next();
+  // A site that keeps its posts elsewhere syncs them in with SYNC_API_KEY: publish only, no admin.
+  const syncKey = (env as unknown as { SYNC_API_KEY?: string }).SYNC_API_KEY;
+  if (url.pathname === '/api/publish' && syncKey && request.headers.get('authorization') === `Bearer ${syncKey}`) return next();
 
   if (url.pathname.startsWith('/api/')) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), {

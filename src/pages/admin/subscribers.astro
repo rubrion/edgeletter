@@ -92,6 +92,7 @@ const fmt = (d: Date | number): string => {
             <tr>
               <th>Email</th>
               <th>Status</th>
+              <th>Language</th>
               <th>Joined</th>
               <th></th>
             </tr>
@@ -104,6 +105,7 @@ const fmt = (d: Date | number): string => {
                 <tr>
                   <td class="email">{s.email}</td>
                   <td><span class={`badge ${s.status}`}>{s.status}</span></td>
+                  <td>{s.lang.toUpperCase()}</td>
                   <td>{fmt(s.createdAt)}</td>
                   <td class="actions">
                     <form method="POST" action={`/api/admin/subscribers/${s.id}/status`}>

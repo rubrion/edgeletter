@@ -10,9 +10,10 @@ interface Props {
 	description: string;
 	pubDate?: Date | null;
 	lang?: Lang;
+	canonical?: string;
 }
 
-const { title, description, pubDate, lang: langProp } = Astro.props;
+const { title, description, pubDate, lang: langProp, canonical } = Astro.props;
 const lang = langProp ?? getLang(Astro.request);
 ---
 
@@ -23,6 +24,7 @@ const lang = langProp ?? getLang(Astro.request);
 			description={description}
 			ogType="article"
 			publishedAt={pubDate ?? null}
+			canonical={canonical}
 		/>
 		<style>
 			main {

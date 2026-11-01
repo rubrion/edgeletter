@@ -4,6 +4,8 @@ import { Font } from 'astro:assets';
 import { hexToRgbTuple, loadSettings } from '../lib/settings';
 
 interface Props {
+	/** A synced post's real home; defaults to this page. */
+	canonical?: string;
 	title: string;
 	description: string;
 	ogType?: 'website' | 'article';
@@ -38,8 +40,8 @@ html[data-theme="dark"] {
 }
 `;
 
-const { title, description, ogType = 'website', publishedAt } = Astro.props;
-const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const { title, description, ogType = 'website', publishedAt, canonical } = Astro.props;
+const canonicalURL = canonical ? new URL(canonical) : new URL(Astro.url.pathname, Astro.site);
 
 const articleJsonLd =
 	ogType === 'article'

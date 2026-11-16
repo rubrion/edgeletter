@@ -57,20 +57,27 @@ const sendViaResend = async (args: SendArgs): Promise<BatchOutcome> => {
   const local = settings.emailFromLocal.trim() || 'noreply';
   const from = `${settings.clientName} <${local}@${fromDomain}>`;
 
-  const payload = recipients.map((r) => {
-    const { html, text, unsubscribeUrl } = render(args, r);
-    return {
-      from,
-      to: r.email,
-      subject: post.title,
-      html,
-      text,
-      headers: {
-        'List-Unsubscribe': `<${unsubscribeUrl}>`,
-        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-      },
-    };
-  });
+  let payload;
+  try {
+    const payload = recipients.map((r) => {
+      const { html, text, unsubscribeUrl } = render(args, r);
+      return {
+        from,
+        to: r.email,
+        subject: post.title,
+        html,
+        text,
+        headers: {
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      };
+    });
+  } catch (err) {
+    // Rendering is deterministic: retrying won't help.
+    console.error('email render failed', err);
+    return { sent: [], transient: [], permanent: ids };
+  }
 
   try {
     const res = await fetch('https://api.resend.com/emails/batch', {
@@ -99,7 +106,14 @@ const sendViaGmail = async (args: SendArgs): Promise<BatchOutcome> => {
   }
   // One message per recipient so each gets its own unsubscribe URL.
   for (const r of recipients) {
-    const { html } = render(args, r);
+    let html: string;
+    try {
+      ({ html } = render(args, r));
+    } catch (err) {
+      console.error('email render failed', err);
+      out.permanent.push(r.id);
+      continue;
+    }
     try {
       const res = await sendBatchGmail({
         user: e.GMAIL_USER,

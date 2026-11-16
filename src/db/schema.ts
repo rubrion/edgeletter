@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /** Publication every single-tenant deployment (and any unknown host) resolves to. */
@@ -104,7 +105,33 @@ export const campaigns = sqliteTable(
     sent: integer('sent').notNull().default(0),
     failed: integer('failed').notNull().default(0),
   },
-  (t) => ({ campaigns_post_idx: index('campaigns_post_idx').on(t.postId) }),
+  (t) => ({
+    campaigns_post_idx: index('campaigns_post_idx').on(t.postId),
+    // One live campaign per post: concurrent publishes can't double-send.
+    campaigns_post_live_unique: uniqueIndex('campaigns_post_live_unique')
+      .on(t.postId)
+      .where(sql`${t.status} IN ('queued', 'sending', 'sent', 'partial')`),
+  }),
+);
+
+/** Per-recipient ledger: idempotent redelivery + source of campaign counters. */
+export const campaignDeliveries = sqliteTable(
+  'campaign_deliveries',
+  {
+    campaignId: text('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    subscriberId: text('subscriber_id').notNull(),
+    /** sending = claimed, in flight; sent/failed are final; skipped = no longer eligible. */
+    status: text('status', { enum: ['sending', 'sent', 'failed', 'skipped'] }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.campaignId, t.subscriberId] }),
+    campaign_deliveries_status_idx: index('campaign_deliveries_status_idx').on(t.campaignId, t.status),
+  }),
 );
 
 export const settings = sqliteTable(

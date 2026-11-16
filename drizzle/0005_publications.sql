@@ -20,6 +20,14 @@ INSERT INTO `publications` (`id`, `handle`, `name`, `custom_domain`, `status`, `
 VALUES ('default', 'default', 'EdgeLetter', NULL, 'active', CAST(unixepoch('subsec') * 1000 AS INTEGER));
 --> statement-breakpoint
 
+-- campaigns references posts: park its rows in an FK-free table and drop it,
+-- so rebuilding posts leaves no dangling reference (D1 checks deferred FKs
+-- at commit and the counter is not reset by a rename).
+CREATE TABLE `__campaigns_backup` AS SELECT * FROM `campaigns`;
+--> statement-breakpoint
+DROP TABLE `campaigns`;
+--> statement-breakpoint
+
 -- posts: slug unique per publication
 CREATE TABLE `__new_posts` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -73,8 +81,8 @@ CREATE INDEX `subscribers_confirm_token_idx` ON `subscribers` (`confirm_token`);
 CREATE INDEX `subscribers_publication_status_idx` ON `subscribers` (`publication_id`, `status`, `lang`);
 --> statement-breakpoint
 
--- campaigns: owned by a publication; counters for queued sending
-CREATE TABLE `__new_campaigns` (
+-- campaigns: recreated with publication + counters, rows restored from the backup
+CREATE TABLE `campaigns` (
 	`id` text PRIMARY KEY NOT NULL,
 	`publication_id` text DEFAULT 'default' NOT NULL REFERENCES `publications`(`id`),
 	`post_id` text NOT NULL REFERENCES `posts`(`id`),
@@ -86,14 +94,38 @@ CREATE TABLE `__new_campaigns` (
 	`failed` integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-INSERT INTO `__new_campaigns` (`id`, `publication_id`, `post_id`, `sent_at`, `status`, `provider_used`)
-SELECT `id`, 'default', `post_id`, `sent_at`, `status`, `provider_used` FROM `campaigns`;
+INSERT INTO `campaigns` (`id`, `publication_id`, `post_id`, `sent_at`, `status`, `provider_used`)
+SELECT `id`, 'default', `post_id`, `sent_at`, `status`, `provider_used` FROM `__campaigns_backup`;
 --> statement-breakpoint
-DROP TABLE `campaigns`;
---> statement-breakpoint
-ALTER TABLE `__new_campaigns` RENAME TO `campaigns`;
+DROP TABLE `__campaigns_backup`;
 --> statement-breakpoint
 CREATE INDEX `campaigns_post_idx` ON `campaigns` (`post_id`);
+--> statement-breakpoint
+-- At most one live campaign per post (blocks double sends from concurrent
+-- publishes). Older duplicates, if any, are retired first.
+UPDATE `campaigns` SET `status` = 'failed'
+WHERE `status` IN ('queued', 'sending', 'sent', 'partial')
+  AND `rowid` NOT IN (
+    SELECT max(`rowid`) FROM `campaigns`
+    WHERE `status` IN ('queued', 'sending', 'sent', 'partial')
+    GROUP BY `post_id`
+  );
+--> statement-breakpoint
+CREATE UNIQUE INDEX `campaigns_post_live_unique` ON `campaigns` (`post_id`)
+WHERE `status` IN ('queued', 'sending', 'sent', 'partial');
+--> statement-breakpoint
+
+-- Per-recipient delivery ledger: makes queue redelivery idempotent and is the
+-- source of truth for campaign counters.
+CREATE TABLE `campaign_deliveries` (
+	`campaign_id` text NOT NULL REFERENCES `campaigns`(`id`) ON DELETE CASCADE,
+	`subscriber_id` text NOT NULL,
+	`status` text NOT NULL,
+	`updated_at` integer NOT NULL,
+	PRIMARY KEY (`campaign_id`, `subscriber_id`)
+);
+--> statement-breakpoint
+CREATE INDEX `campaign_deliveries_status_idx` ON `campaign_deliveries` (`campaign_id`, `status`);
 --> statement-breakpoint
 
 -- settings: key/value per publication

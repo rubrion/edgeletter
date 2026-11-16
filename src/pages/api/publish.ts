@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { and, eq, inArray } from 'drizzle-orm';
 import { marked } from 'marked';
-import { audienceFor, enqueueCampaign } from '../../lib/email-queue';
+import { audienceFor, CampaignAlreadyLive, enqueueCampaign, liveCampaignFor, retireStaleCampaigns } from '../../lib/email-queue';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { pubId } from '../../lib/tenant';
 import { getDbInstance, campaigns, posts, type Post } from '../../db';
@@ -69,21 +69,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .limit(1);
   }
 
-  // Has a successful campaign already gone out? If so, never re-send.
-  const priorCampaign = existing
-    ? (
-        await db
-          .select()
-          .from(campaigns)
-          .where(
-            and(
-              eq(campaigns.postId, existing.id),
-              inArray(campaigns.status, ['queued', 'sending', 'sent', 'partial']),
-            ),
-          )
-          .limit(1)
-      )[0]
-    : undefined;
+  // Has a campaign already gone out (or is one in flight)? If so, never re-send.
+  // Campaigns stuck in queued/sending for hours are retired first so they
+  // don't block forever.
+  if (existing) await retireStaleCampaigns(existing.id);
+  const priorCampaign = existing ? await liveCampaignFor(existing.id) : undefined;
   const alreadySent = !!priorCampaign;
 
   // Only stamp publishedAt on the first draft → published transition.
@@ -153,6 +143,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
       alreadySent: false,
     });
   } catch (err) {
+    if (err instanceof CampaignAlreadyLive) {
+      // A concurrent publish of the same post won the race.
+      return Response.json({ post: saved, campaign: await liveCampaignFor(saved.id), dispatch: null, alreadySent: true });
+    }
     const msg = err instanceof Error ? err.message : String(err);
     return Response.json({ post: saved, campaign: null, dispatch: null, alreadySent: false, error: msg }, { status: 502 });
   }

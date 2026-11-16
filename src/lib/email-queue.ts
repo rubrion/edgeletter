@@ -1,6 +1,15 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
-import { campaigns, emailSuppressions, getDbInstance, posts, publications, subscribers, type Post } from '../db';
-import { MAX_BATCH, providerFor, sendBatch, type Recipient } from './dispatch';
+import { and, eq, inArray, lt, sql } from 'drizzle-orm';
+import {
+  campaignDeliveries,
+  campaigns,
+  emailSuppressions,
+  getDbInstance,
+  posts,
+  publications,
+  subscribers,
+  type Post,
+} from '../db';
+import { providerFor, sendBatch, type Recipient } from './dispatch';
 import { loadSettings } from './settings';
 import { publicationHost } from './tenant';
 
@@ -8,10 +17,10 @@ import { publicationHost } from './tenant';
  * Campaign fan-out.
  *
  * Publishing records a `queued` campaign and pushes recipient batches onto
- * EMAIL_QUEUE; the queue consumer (src/worker.ts) sends each batch, retries
- * transient failures with backoff, and bumps the campaign's counters. When
- * no queue is bound (local dev, minimal white-label deploys) the batches are
- * processed inline, as before — same code path, just synchronous.
+ * EMAIL_QUEUE; the consumer (src/worker.ts) sends each batch. Every recipient
+ * is tracked in `campaign_deliveries`, which makes redelivery idempotent
+ * (Queues is at-least-once) and is the only source of the campaign counters.
+ * Without a queue binding, batches are processed inline through the same path.
  */
 
 export type EmailJob = {
@@ -22,7 +31,17 @@ export type EmailJob = {
   attempt: number;
 };
 
-const MAX_ATTEMPTS = 4;
+/** D1 caps bound parameters at 100 per statement: keep id lists well under. */
+export const JOB_SIZE = 50;
+const INSERT_CHUNK = 20; // 4 columns per delivery row
+const MAX_ATTEMPTS = 4; // app-level retries for transient provider failures
+/** Queue redeliveries (wrangler max_retries) before recipients are written off. */
+export const MAX_QUEUE_ATTEMPTS = 5;
+/** A queued/sending campaign older than this no longer blocks a re-send. */
+export const STALE_CAMPAIGN_MS = 6 * 60 * 60 * 1000;
+
+const LIVE = ['queued', 'sending', 'sent', 'partial'] as const;
+const FINAL = ['sent', 'failed', 'skipped'] as const;
 
 const queueOf = (env: Env): Queue<EmailJob> | undefined =>
   (env as unknown as { EMAIL_QUEUE?: Queue<EmailJob> }).EMAIL_QUEUE;
@@ -35,8 +54,7 @@ const chunk = <T>(xs: T[], n: number): T[][] => {
 
 /** Active, non-suppressed subscribers of this publication in the post's language. */
 export const audienceFor = async (publicationId: string, lang: Post['lang']): Promise<string[]> => {
-  const db = getDbInstance();
-  const rows = await db
+  const rows = await getDbInstance()
     .select({ id: subscribers.id })
     .from(subscribers)
     .leftJoin(emailSuppressions, eq(emailSuppressions.email, subscribers.email))
@@ -50,6 +68,32 @@ export const audienceFor = async (publicationId: string, lang: Post['lang']): Pr
     );
   return rows.map((r) => r.id);
 };
+
+/** Retire queued/sending campaigns for a post that have been stuck too long. */
+export const retireStaleCampaigns = async (postId: string): Promise<void> => {
+  await getDbInstance()
+    .update(campaigns)
+    .set({ status: 'failed' })
+    .where(
+      and(
+        eq(campaigns.postId, postId),
+        inArray(campaigns.status, ['queued', 'sending']),
+        lt(campaigns.sentAt, new Date(Date.now() - STALE_CAMPAIGN_MS)),
+      ),
+    );
+};
+
+/** The live campaign for a post, if any (queued, sending or delivered). */
+export const liveCampaignFor = async (postId: string) =>
+  (
+    await getDbInstance()
+      .select()
+      .from(campaigns)
+      .where(and(eq(campaigns.postId, postId), inArray(campaigns.status, [...LIVE])))
+      .limit(1)
+  )[0];
+
+export class CampaignAlreadyLive extends Error {}
 
 export type EnqueueResult = { campaignId: string; recipients: number; queued: boolean };
 
@@ -66,21 +110,28 @@ export const enqueueCampaign = async ({
 }): Promise<EnqueueResult> => {
   const db = getDbInstance();
   const empty = subscriberIds.length === 0;
-  const [campaign] = await db
-    .insert(campaigns)
-    .values({
-      publicationId,
-      postId: post.id,
-      sentAt: new Date(),
-      status: empty ? 'sent' : 'queued',
-      providerUsed: providerFor(env),
-      recipients: subscriberIds.length,
-    })
-    .returning({ id: campaigns.id });
-  const campaignId = campaign!.id;
+  let campaignId: string;
+  try {
+    const [row] = await db
+      .insert(campaigns)
+      .values({
+        publicationId,
+        postId: post.id,
+        sentAt: new Date(),
+        status: empty ? 'sent' : 'queued',
+        providerUsed: providerFor(env),
+        recipients: subscriberIds.length,
+      })
+      .returning({ id: campaigns.id });
+    campaignId = row!.id;
+  } catch (err) {
+    // campaigns_post_live_unique: a concurrent publish already claimed this post.
+    if (/UNIQUE constraint failed/i.test(String(err))) throw new CampaignAlreadyLive();
+    throw err;
+  }
   if (empty) return { campaignId, recipients: 0, queued: false };
 
-  const jobs: EmailJob[] = chunk(subscriberIds, MAX_BATCH).map((ids) => ({
+  const jobs: EmailJob[] = chunk(subscriberIds, JOB_SIZE).map((ids) => ({
     campaignId,
     publicationId,
     postId: post.id,
@@ -90,16 +141,28 @@ export const enqueueCampaign = async ({
 
   const queue = queueOf(env);
   if (queue) {
-    // sendBatch accepts up to 100 messages per call.
-    for (const group of chunk(jobs, 100)) {
-      await queue.sendBatch(group.map((body) => ({ body })));
+    let enqueued = 0;
+    try {
+      for (const group of chunk(jobs, 100)) {
+        await queue.sendBatch(group.map((body) => ({ body })));
+        enqueued += group.reduce((n, j) => n + j.subscriberIds.length, 0);
+      }
+    } catch (err) {
+      // Only what actually reached the queue can ever be counted; shrink the
+      // target so the campaign still settles instead of sitting in `queued`.
+      await db
+        .update(campaigns)
+        .set({ recipients: enqueued, ...(enqueued === 0 ? { status: 'failed' as const } : {}) })
+        .where(eq(campaigns.id, campaignId));
+      if (enqueued > 0) await settle(campaignId);
+      throw err;
     }
     return { campaignId, recipients: subscriberIds.length, queued: true };
   }
 
   for (const first of jobs) {
-    // No queue: retry transient failures right away until MAX_ATTEMPTS, after
-    // which processEmailJob counts them as failed, so the campaign always settles.
+    // No queue: retry transient failures right away until MAX_ATTEMPTS; after
+    // that they are recorded as failed, so the campaign always settles.
     let job: EmailJob | null = first;
     while (job) {
       const retry: string[] = await processEmailJob(env, job);
@@ -109,9 +172,65 @@ export const enqueueCampaign = async ({
   return { campaignId, recipients: subscriberIds.length, queued: false };
 };
 
-/** Send one batch; returns ids that should be retried later (empty when done). */
+const setDeliveries = async (
+  campaignId: string,
+  ids: string[],
+  status: (typeof campaignDeliveries.$inferInsert)['status'],
+): Promise<void> => {
+  if (ids.length === 0) return;
+  const db = getDbInstance();
+  const now = new Date();
+  for (const part of chunk(ids, INSERT_CHUNK)) {
+    await db
+      .insert(campaignDeliveries)
+      .values(part.map((subscriberId) => ({ campaignId, subscriberId, status, updatedAt: now })))
+      .onConflictDoUpdate({
+        target: [campaignDeliveries.campaignId, campaignDeliveries.subscriberId],
+        set: { status, updatedAt: now },
+      });
+  }
+};
+
+/** Recompute counters and status from the ledger in one atomic statement. */
+export const settle = async (campaignId: string): Promise<void> => {
+  const d = (statuses: string) =>
+    sql.raw(
+      `(SELECT count(*) FROM campaign_deliveries d WHERE d.campaign_id = campaigns.id AND d.status IN (${statuses}))`,
+    );
+  await getDbInstance().run(sql`
+    UPDATE campaigns SET
+      sent = ${d("'sent'")},
+      failed = ${d("'failed','skipped'")},
+      status = CASE
+        WHEN ${d("'sent','failed','skipped'")} < recipients THEN 'sending'
+        WHEN ${d("'failed','skipped'")} = 0 THEN 'sent'
+        WHEN ${d("'sent'")} = 0 THEN 'failed'
+        ELSE 'partial' END
+    WHERE id = ${campaignId} AND recipients > 0
+  `);
+};
+
+/** Recipients of this job that already reached a final state (redelivery). */
+const finalized = async (campaignId: string, ids: string[]): Promise<Set<string>> => {
+  const rows = await getDbInstance()
+    .select({ id: campaignDeliveries.subscriberId })
+    .from(campaignDeliveries)
+    .where(
+      and(
+        eq(campaignDeliveries.campaignId, campaignId),
+        inArray(campaignDeliveries.subscriberId, ids),
+        inArray(campaignDeliveries.status, [...FINAL]),
+      ),
+    );
+  return new Set(rows.map((r) => r.id));
+};
+
+/** Send one job; returns ids to retry later (empty when the job is done). */
 export const processEmailJob = async (env: Env, job: EmailJob): Promise<string[]> => {
   const db = getDbInstance();
+  const done = await finalized(job.campaignId, job.subscriberIds);
+  const pending = job.subscriberIds.filter((id) => !done.has(id));
+  if (pending.length === 0) return [];
 
   const [post] = await db
     .select()
@@ -124,53 +243,46 @@ export const processEmailJob = async (env: Env, job: EmailJob): Promise<string[]
     .where(eq(publications.id, job.publicationId))
     .limit(1);
 
-  // Post deleted or publication suspended mid-send: count the rest as failed.
+  // Post deleted or publication suspended mid-send: write the rest off.
   if (!post || !publication || publication.status !== 'active') {
-    await record(job.campaignId, 0, job.subscriberIds.length);
+    await setDeliveries(job.campaignId, pending, 'failed');
+    await settle(job.campaignId);
     return [];
   }
 
-  // Re-check status + suppressions at send time: people unsubscribe or bounce
-  // between publish and delivery.
+  // People unsubscribe or bounce between publish and delivery: re-check now.
   const recipients: Recipient[] = await db
     .select({ id: subscribers.id, email: subscribers.email })
     .from(subscribers)
     .leftJoin(emailSuppressions, eq(emailSuppressions.email, subscribers.email))
     .where(
       and(
-        inArray(subscribers.id, job.subscriberIds),
+        inArray(subscribers.id, pending),
         eq(subscribers.publicationId, job.publicationId),
         eq(subscribers.status, 'active'),
         sql`${emailSuppressions.email} IS NULL`,
       ),
     );
-  const skipped = job.subscriberIds.length - recipients.length;
+  const eligible = new Set(recipients.map((r) => r.id));
+  await setDeliveries(job.campaignId, pending.filter((id) => !eligible.has(id)), 'skipped');
+  // Claim before sending so a crash mid-send leaves a visible in-flight marker.
+  await setDeliveries(job.campaignId, [...eligible], 'sending');
 
   const settings = await loadSettings(job.publicationId);
   const outcome = await sendBatch({ env, settings, host: publicationHost(publication), post, recipients });
 
   const giveUp = job.attempt >= MAX_ATTEMPTS;
-  const failedNow = outcome.permanent.length + (giveUp ? outcome.transient.length : 0) + skipped;
-  await record(job.campaignId, outcome.sent.length, failedNow);
+  await setDeliveries(job.campaignId, outcome.sent, 'sent');
+  await setDeliveries(job.campaignId, giveUp ? [...outcome.permanent, ...outcome.transient] : outcome.permanent, 'failed');
+  await settle(job.campaignId);
   return giveUp ? [] : outcome.transient;
 };
 
-/** Add to a campaign's counters and settle its status once every recipient is accounted for. */
-const record = async (campaignId: string, sent: number, failed: number): Promise<void> => {
-  if (sent === 0 && failed === 0) return;
-  const db = getDbInstance();
-  await db
-    .update(campaigns)
-    .set({
-      sent: sql`${campaigns.sent} + ${sent}`,
-      failed: sql`${campaigns.failed} + ${failed}`,
-      status: sql`CASE
-        WHEN ${campaigns.sent} + ${sent} + ${campaigns.failed} + ${failed} < ${campaigns.recipients} THEN 'sending'
-        WHEN ${campaigns.failed} + ${failed} = 0 THEN 'sent'
-        WHEN ${campaigns.sent} + ${sent} = 0 THEN 'failed'
-        ELSE 'partial' END`,
-    })
-    .where(eq(campaigns.id, campaignId));
+/** Give up on a job: every recipient not already final is recorded as failed. */
+export const failEmailJob = async (job: EmailJob): Promise<void> => {
+  const done = await finalized(job.campaignId, job.subscriberIds);
+  await setDeliveries(job.campaignId, job.subscriberIds.filter((id) => !done.has(id)), 'failed');
+  await settle(job.campaignId);
 };
 
 /** Queue consumer: process each job; re-enqueue transient failures with backoff. */
@@ -186,8 +298,18 @@ export const consumeEmailBatch = async (batch: MessageBatch<EmailJob>, env: Env)
       }
       msg.ack();
     } catch (err) {
-      // Unexpected failure (e.g. D1 hiccup): let the queue redeliver the whole job.
-      console.error('email job failed', job.campaignId, err);
+      console.error('email job failed', job.campaignId, msg.attempts, err);
+      if (msg.attempts >= MAX_QUEUE_ATTEMPTS) {
+        // Last delivery before the DLQ: record the outcome so the campaign settles.
+        try {
+          await failEmailJob(job);
+          msg.ack();
+          continue;
+        } catch (inner) {
+          console.error('could not record failed email job', job.campaignId, inner);
+        }
+      }
+      // Redelivery is safe: the ledger skips recipients that already finished.
       msg.retry({ delaySeconds: 30 });
     }
   }

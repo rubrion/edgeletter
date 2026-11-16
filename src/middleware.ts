@@ -1,32 +1,8 @@
 import { env } from 'cloudflare:workers';
 import { defineMiddleware } from 'astro:middleware';
 import { isAdminAuthed } from './lib/auth';
-import { resolvePublication } from './lib/tenant';
-
-/**
- * Canonical form of a request path for auth decisions. Astro matches routes
- * loosely (trailing slash ignored, `.` segments tolerated), so the guard must
- * normalize at least as aggressively as the router or `/api/publish/` and
- * `/api/publish/.` slip past an exact-string check.
- */
-export const normalizePath = (pathname: string): string => {
-  let decoded = pathname;
-  try {
-    decoded = decodeURIComponent(pathname);
-  } catch {
-    /* malformed escapes: judge the raw path */
-  }
-  const out: string[] = [];
-  for (const seg of decoded.split('/')) {
-    if (seg === '' || seg === '.') continue;
-    if (seg === '..') out.pop();
-    else out.push(seg.toLowerCase());
-  }
-  return '/' + out.join('/');
-};
-
-/** True when `path` is `base` or below it (segment-wise, not string prefix). */
-const under = (path: string, base: string): boolean => path === base || path.startsWith(`${base}/`);
+import { normalizePath, under } from './lib/paths';
+import { resolvePublication, TenantLookupError } from './lib/tenant';
 
 const PUBLIC_ADMIN_PATHS = new Set(['/admin/login', '/api/admin/login']);
 
@@ -57,7 +33,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Webhooks are platform-level, not tied to a publication host.
   if (under(path, '/api/webhooks')) return next();
 
-  const publication = await resolvePublication(request.headers.get('host'));
+  let publication;
+  try {
+    publication = await resolvePublication(request.headers.get('host'));
+  } catch (err) {
+    if (err instanceof TenantLookupError) {
+      return notFoundPage(503, 'Temporarily unavailable', 'Please try again in a moment.');
+    }
+    throw err;
+  }
   if (!publication) {
     return notFoundPage(404, 'Nothing here yet', 'There is no publication at this address.');
   }

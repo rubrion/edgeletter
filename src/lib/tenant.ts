@@ -37,6 +37,9 @@ const columns = {
   customDomain: publications.customDomain,
 };
 
+/** Thrown when the publication can't be determined (e.g. D1 unavailable). */
+export class TenantLookupError extends Error {}
+
 const lookup = async (host: string): Promise<PublicationContext | null> => {
   const db = getDbInstance();
   try {
@@ -48,25 +51,32 @@ const lookup = async (host: string): Promise<PublicationContext | null> => {
       const handle = host.slice(0, -(root.length + 1));
       if (handle && !handle.includes('.')) {
         const [byHandle] = await db.select(columns).from(publications).where(eq(publications.handle, handle)).limit(1);
-        if (byHandle) return byHandle;
-        // A subdomain of the platform with no publication behind it.
-        return null;
+        return byHandle ?? null;
       }
     }
 
     const [def] = await db.select(columns).from(publications).where(eq(publications.id, DEFAULT_PUBLICATION_ID)).limit(1);
-    return def ?? FALLBACK;
-  } catch {
-    // Pre-migration database: behave as the single default publication.
-    return FALLBACK;
+    return def ?? null;
+  } catch (err) {
+    // Only a pre-migration database (no publications table yet) may fall back
+    // to the default publication. Anything else fails closed: serving or
+    // writing to the wrong tenant is worse than a 503.
+    if (/no such table/i.test(String(err))) return FALLBACK;
+    throw new TenantLookupError(String(err));
   }
 };
+
+const MAX_ENTRIES = 1000;
+const NEGATIVE_TTL_MS = 10_000;
 
 export const resolvePublication = async (hostHeader: string | null): Promise<PublicationContext | null> => {
   const host = (hostHeader ?? '').toLowerCase().replace(/:\d+$/, '');
   const hit = cache.get(host);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
-  const value = await lookup(host);
+  const ttl = hit?.value ? TTL_MS : NEGATIVE_TTL_MS;
+  if (hit && Date.now() - hit.at < ttl) return hit.value;
+  const value = await lookup(host); // throws TenantLookupError: never cached
+  if (value === FALLBACK) return value; // pre-migration fallback: don't cache
+  if (cache.size >= MAX_ENTRIES) cache.clear();
   cache.set(host, { value, at: Date.now() });
   return value;
 };

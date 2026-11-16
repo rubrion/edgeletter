@@ -1,147 +1,136 @@
 /*
- * Base styles adapted from Bear Blog (MIT) — themed with --theme-primary
- * which BaseHead.astro injects per tenant.
+ * Public site — Tactile Editorial Stationery.
+ * Tenant colors (--theme-primary, --bg-body, --black, --gray-*) are injected
+ * by BaseHead.astro; tokens.css derives surfaces, shadows and type from them.
  */
-:root {
-	--theme-primary: #FF0040;
-	--accent: var(--theme-primary);
-	--black: 15, 18, 25;
-	--gray: 96, 115, 159;
-	--gray-light: 229, 233, 240;
-	--gray-dark: 34, 41, 57;
-	--gray-gradient: rgba(var(--gray-light), 50%), #fff;
-	--bg-body: #fff;
-	--bg-header: #fff;
-	--bg-subscribe: rgb(var(--gray-light));
-	--box-shadow:
-		0 2px 6px rgba(var(--gray), 25%), 0 8px 24px rgba(var(--gray), 33%),
-		0 16px 32px rgba(var(--gray), 33%);
-}
+@import './tokens.css';
 
-/* Dark mode — set by pre-paint script + toggle; also matches system preference */
-[data-theme="dark"] {
-	--black: 240, 243, 250;
-	--gray: 130, 145, 175;
-	--gray-light: 38, 43, 60;
-	--gray-dark: 200, 210, 230;
-	--gray-gradient: rgba(var(--gray-light), 60%), #0f1119;
-	--bg-body: #0f1119;
-	--bg-header: #1b1e2d;
-	--bg-subscribe: rgb(var(--gray-light));
-}
+html { background-color: var(--bg-body); }
 
 body {
-	font-family: var(--font-atkinson);
+	font-family: var(--font-body-stack);
 	margin: 0;
 	padding: 0;
 	text-align: left;
 	background-color: var(--bg-body);
-	background-image: linear-gradient(var(--gray-gradient));
-	background-repeat: no-repeat;
-	background-size: 100% 600px;
+	color: var(--text);
+	font-size: 19px;
+	line-height: 1.7;
 	word-wrap: break-word;
 	overflow-wrap: break-word;
-	color: rgb(var(--gray-dark));
-	font-size: 20px;
-	line-height: 1.7;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
 	transition: background-color 0.2s, color 0.2s;
 }
+
 main {
-	width: 720px;
+	width: 760px;
 	max-width: calc(100% - 2em);
 	margin: auto;
-	padding: 3em 1em;
+	padding: 4.5em 1em 5em;
 }
+
 h1, h2, h3, h4, h5, h6 {
 	margin: 0 0 0.5rem 0;
-	color: rgb(var(--black));
-	line-height: 1.2;
+	color: var(--ink);
+	font-family: var(--font-display-stack);
+	font-weight: 400;
+	letter-spacing: -0.02em;
+	line-height: 1.05;
 }
-h1 { font-size: 3.052em; }
-h2 { font-size: 2.441em; }
-h3 { font-size: 1.953em; }
-h4 { font-size: 1.563em; }
+h1 { font-size: 3.6em; }
+h2 { font-size: 2.5em; }
+h3 { font-size: 1.95em; }
+h4 { font-size: 1.5em; }
 h5 { font-size: 1.25em; }
-strong, b { font-weight: 700; }
-a { color: var(--accent); }
-a:hover { color: var(--accent); }
-p { margin-bottom: 1em; }
-.prose p { margin-bottom: 2em; }
-textarea { width: 100%; font-size: 16px; }
-input { font-size: 16px; }
-table { width: 100%; }
-img { max-width: 100%; height: auto; border-radius: 8px; }
-code {
-	padding: 2px 5px;
-	background-color: rgb(var(--gray-light));
-	color: rgb(var(--gray-dark));
-	border-radius: 2px;
-}
-pre { padding: 1.5em; border-radius: 8px; background-color: rgb(var(--gray-light)); }
-pre > code { all: unset; }
-blockquote {
-	border-left: 4px solid var(--accent);
-	padding: 0 0 0 20px;
-	margin: 0;
-	font-size: 1.333em;
-}
-hr { border: none; border-top: 1px solid rgb(var(--gray-light)); }
+h6 { font-size: 1.1em; }
 
-/* Brand-colored focus rings instead of browser-default blue */
-:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
+strong, b { font-weight: 600; }
+em, i { font-style: italic; }
+
+a {
+	color: var(--accent);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.18em;
 }
-/* Colorize native form controls (checkboxes, range, etc.) */
-:root { accent-color: var(--accent); }
+a:hover { color: var(--accent-deep); }
+
+p { margin: 0 0 1em; }
+.prose p { margin-bottom: 1.4em; }
+.prose h2, .prose h3, .prose h4 { margin-top: 1.6em; }
+.prose ul, .prose ol { padding-left: 1.3em; }
+.prose li { margin-bottom: 0.4em; }
+.prose li::marker { color: var(--accent); }
+
+textarea { width: 100%; font-size: 16px; font-family: inherit; }
+input { font-size: 16px; font-family: inherit; }
+button { font-family: inherit; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border-bottom: var(--hairline); padding: 0.5em 0.6em; text-align: left; }
+th {
+	font-size: 11.5px;
+	letter-spacing: 0.15em;
+	text-transform: uppercase;
+	font-weight: 500;
+	color: var(--muted);
+}
+
+img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 0;
+	box-shadow: var(--shadow-paper);
+}
+
+code {
+	padding: 1px 5px;
+	background-color: rgba(var(--gray-light), 0.55);
+	color: var(--ink);
+	border-radius: 0;
+	font-size: 0.86em;
+	font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+pre {
+	padding: 1.4em 1.5em;
+	border-radius: 0;
+	border: var(--hairline);
+	background-color: var(--bg-body);
+	overflow-x: auto;
+	font-size: 0.85em;
+	line-height: 1.6;
+}
+pre > code { all: unset; font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+
+blockquote {
+	margin: 1.8em 0;
+	padding: 0.2em 0 0.2em 1.4em;
+	border-left: 1px solid var(--accent);
+	font-family: var(--font-display-stack);
+	font-style: italic;
+	font-size: 1.45em;
+	line-height: 1.3;
+	letter-spacing: -0.01em;
+	color: var(--ink);
+}
+blockquote p { margin-bottom: 0.5em; }
+blockquote p:last-child { margin-bottom: 0; }
+
+hr {
+	border: none;
+	border-top: var(--hairline);
+	margin: 2.5em 0;
+}
+
+::selection { background: var(--accent); color: var(--on-accent); }
+
+:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 3px;
+}
 
 @media (max-width: 720px) {
-	body { font-size: 18px; }
-	main { padding: 1em; }
-}
-
-.subscribe-form {
-	display: flex;
-	gap: 0.5rem;
-	max-width: 420px;
-	margin: 1.5rem auto 0;
-	flex-wrap: wrap;
-	justify-content: center;
-}
-.subscribe-form input[type="email"] {
-	flex: 1;
-	min-width: 200px;
-	padding: 0.6rem 0.8rem;
-	border: 1px solid rgb(var(--gray-light));
-	border-radius: 6px;
-	background: var(--bg-body);
-	color: rgb(var(--gray-dark));
-}
-.subscribe-form button {
-	padding: 0.6rem 1.2rem;
-	background: var(--accent);
-	color: #fff;
-	border: none;
-	border-radius: 6px;
-	cursor: pointer;
-	font-weight: 600;
-}
-.subscribe-status {
-	margin-top: 0.5rem;
-	font-size: 0.9rem;
-	color: rgb(var(--gray));
-}
-
-.sr-only {
-	border: 0;
-	padding: 0;
-	margin: 0;
-	position: absolute !important;
-	height: 1px;
-	width: 1px;
-	overflow: hidden;
-	clip: rect(1px 1px 1px 1px);
-	clip: rect(1px, 1px, 1px, 1px);
-	clip-path: inset(50%);
-	white-space: nowrap;
+	body { font-size: 17px; }
+	main { padding: 2.5em 1em 3.5em; }
+	h1 { font-size: 2.7em; }
+	h2 { font-size: 2em; }
 }

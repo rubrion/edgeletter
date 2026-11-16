@@ -1,3 +1,4 @@
+import { EMAIL, deepen, microStyle } from './email-style';
 import { sendBatchGmail } from './smtp';
 import type { Settings } from './settings';
 
@@ -42,16 +43,31 @@ const buildBody = ({
   lang?: 'en' | 'pt';
 }) => {
   const w = WORDS[lang];
-  const html = `<!doctype html><html><body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,Segoe UI,sans-serif;color:#1a1a1a;">
-<div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-  <div style="background:#fff;border-radius:12px;padding:32px;border-top:4px solid ${themeColor};">
-    <h1 style="margin:0 0 12px;font-size:22px;">${w.title}</h1>
-    <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">${w.body(escapeHtml(clientName))}</p>
-    <p style="margin:0 0 20px;"><a href="${confirmUrl}" style="display:inline-block;background:${themeColor};color:#fff;padding:11px 20px;border-radius:6px;text-decoration:none;font-weight:600;">${w.button}</a></p>
-    <p style="margin:0;font-size:13px;color:#666;">${w.paste} <br /><span style="word-break:break-all;color:${themeColor};">${confirmUrl}</span></p>
-    <p style="margin:24px 0 0;padding-top:18px;border-top:1px solid #eee;font-size:12px;color:#888;">${w.ignore}</p>
-  </div>
-</div>
+  const deep = deepen(themeColor);
+  const E = EMAIL;
+  const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+${E.fontsLink}</head>
+<body style="margin:0;padding:0;background:${E.paper};font-family:${E.body};color:${E.text};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${E.paper};">
+  <tr><td align="center" style="padding:40px 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+      <tr><td align="center" style="background:${themeColor};padding:24px 24px 20px;">
+        <p style="margin:0;${microStyle(deep)}font-size:12px;font-weight:600;text-shadow:0 1px 0 rgba(255,255,255,0.14);">[&nbsp;${escapeHtml(clientName)}&nbsp;]</p>
+      </td></tr>
+      <tr><td align="center" style="background:${E.card};border:1px solid ${E.hairline};border-top:0;padding:40px 40px 34px;">
+        <h1 style="margin:0 0 16px;font-family:${E.display};font-weight:400;font-size:36px;line-height:1.05;letter-spacing:-0.02em;color:${E.ink};">${w.title}</h1>
+        <p style="margin:0 0 28px;font-size:16px;line-height:1.65;color:${E.text};">${w.body(escapeHtml(clientName))}</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 26px;">
+          <tr><td style="background:${themeColor};">
+            <a href="${confirmUrl}" style="display:inline-block;padding:15px 28px;${microStyle(E.card)}font-weight:600;text-decoration:none;">${w.button}</a>
+          </td></tr>
+        </table>
+        <p style="margin:0;font-size:13px;font-style:italic;color:${E.muted};">${w.paste}<br /><span style="word-break:break-all;font-style:normal;color:${themeColor};">${confirmUrl}</span></p>
+        <p style="margin:26px 0 0;padding-top:20px;border-top:1px solid ${E.hairline};${microStyle(E.muted)}font-size:10px;line-height:1.8;">${w.ignore}</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
 </body></html>`;
   const text = [
     w.subject(clientName),

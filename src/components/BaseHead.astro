@@ -83,7 +83,9 @@ const articleJsonLd =
 <link rel="alternate" type="application/rss+xml" title={clientName} href={new URL('rss.xml', Astro.site)} />
 <meta name="generator" content={Astro.generator} />
 
-<Font cssVariable="--font-atkinson" preload />
+<Font cssVariable="--font-display" preload />
+<Font cssVariable="--font-script" />
+<Font cssVariable="--font-body" preload />
 
 <style is:inline set:html={themeCss}></style>
 

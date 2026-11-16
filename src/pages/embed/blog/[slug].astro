@@ -1,4 +1,6 @@
 ---
+import { Font } from 'astro:assets';
+import '../../../styles/embed.css';
 import { and, eq } from 'drizzle-orm';
 import { getDbInstance, posts } from '../../../db';
 import { loadSettings, hexToRgbTuple } from '../../../lib/settings';
@@ -32,7 +34,7 @@ const showBackLink = q.get('back') !== '0';
 const backHref = `${Astro.url.origin}/embed/blog${Astro.url.search}`;
 const showWatermark = settings.widgetHideWatermark !== '1';
 
-const fontStack = fontInherit ? 'inherit' : 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const fontStack = fontInherit ? 'inherit' : "var(--font-body, 'Newsreader'), Georgia, serif";
 
 const rootStyle = [
   `--bg: ${hexToRgbTuple(settings.colorBgLight)}`,
@@ -60,73 +62,27 @@ const dataTheme = themeMode === 'auto' ? null : themeMode;
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>{post.title} — {settings.clientName}</title>
-    <style is:global>
-      html, body {
-        margin: 0; padding: 0;
-        background: rgb(var(--bg));
-        color: rgb(var(--text));
-        font-family: var(--fontStack);
-        font-size: 16px;
-        line-height: 1.65;
-        color-scheme: light;
-      }
-      html[data-theme="dark"] body, html[data-theme="dark"] {
-        background: rgb(var(--bgDark));
-        color: rgb(var(--textDark));
-        color-scheme: dark;
-      }
-      @media (prefers-color-scheme: dark) {
-        html:not([data-theme="light"]) { color-scheme: dark; }
-        html:not([data-theme="light"]) body { background: rgb(var(--bgDark)); color: rgb(var(--textDark)); }
-      }
-      .wrap { max-width: var(--maxWidth); margin: 0 auto; padding: 1.25rem 1.1rem; box-sizing: border-box; }
-      h1 { color: rgb(var(--heading)); margin: 0 0 0.4rem; line-height: 1.25; font-size: 1.55rem; }
-      html[data-theme="dark"] h1 { color: rgb(var(--headingDark)); }
-      .meta { color: rgb(var(--muted)); font-size: 0.85rem; margin-bottom: 1rem; }
-      html[data-theme="dark"] .meta { color: rgb(var(--mutedDark)); }
-      .back { display: inline-block; margin-bottom: 1rem; color: var(--accent); text-decoration: none; font-size: 0.85rem; }
-      .back:hover { text-decoration: underline; }
-      .content :is(h2, h3, h4) { color: rgb(var(--heading)); }
-      html[data-theme="dark"] .content :is(h2, h3, h4) { color: rgb(var(--headingDark)); }
-      .content a { color: var(--accent); }
-      .content img, .content video { max-width: 100%; height: auto; border-radius: 6px; }
-      .content pre { overflow-x: auto; padding: 0.75rem; border-radius: 6px; background: rgba(0,0,0,0.04); }
-      html[data-theme="dark"] .content pre { background: rgba(255,255,255,0.05); }
-      .content code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
-      .content blockquote { border-left: 3px solid rgb(var(--border)); margin: 1em 0; padding: 0 0 0 1em; color: rgb(var(--muted)); }
-      html[data-theme="dark"] .content blockquote { border-left-color: rgb(var(--borderDark)); color: rgb(var(--mutedDark)); }
-      .ep-wm {
-        display: inline-flex; align-items: center; gap: 6px;
-        margin: 2rem auto 0.25rem; padding: 4px 10px;
-        background: rgba(15,17,25,0.78); color: #fff;
-        border-radius: 999px; font-size: 11px; line-height: 1;
-        text-decoration: none; opacity: 0.7; transition: opacity .15s;
-        width: fit-content;
-      }
-      .ep-wm:hover { opacity: 1; }
-      .ep-wm img { display: block; }
-      .ep-wm-row { display: flex; justify-content: center; }
-    </style>
+    <Font cssVariable="--font-display" preload />
+    <Font cssVariable="--font-body" preload />
   </head>
   <body>
     <div class="wrap">
-      {showBackLink && <a class="back" href={backHref}>← Back</a>}
-      <h1>{post.title}</h1>
-      {post.publishedAt && (
-        <div class="meta">{new Date(post.publishedAt).toLocaleDateString()}</div>
-      )}
-      <div class="content">
-        <Fragment set:html={post.contentHtml} />
+      {showBackLink && <a class="back micro" href={backHref}>← Back</a>}
+      <header class="post-head">
+        <h1>{post.title}</h1>
+        {post.publishedAt && (
+          <div class="meta micro">{new Date(post.publishedAt).toLocaleDateString()}</div>
+        )}
+      </header>
+      <div class="sheet">
+        <div class="content">
+          <Fragment set:html={post.contentHtml} />
+        </div>
       </div>
       {showWatermark && (
         <div class="ep-wm-row">
-          <a class="ep-wm" href="https://rubrion.ai/?utm_source=edgeletter-widget"
-         target="_blank" rel="noopener nofollow"
-         aria-label="Powered by Rubrion">
-        <img src="https://media.rubrion.ai/images/logo_rubrion_ver4_white.svg"
-             alt="Rubrion" width="14" height="14" loading="lazy" />
-        <span>Powered by Rubrion</span>
-          </a>
+          <a class="ep-wm micro" href="https://rubrion.ai/?utm_source=edgeletter-widget"
+             target="_blank" rel="noopener nofollow">Powered by Rubrion</a>
         </div>
       )}
     </div>

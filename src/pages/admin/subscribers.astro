@@ -3,6 +3,7 @@ import { desc } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../db';
 import { loadSettings } from '../../lib/settings';
 import AdminAppbar from '../../components/AdminAppbar.astro';
+import AdminHead from '../../components/AdminHead.astro';
 
 const settings = await loadSettings();
 const themeColor = settings.themePrimaryColor;
@@ -21,58 +22,35 @@ const fmt = (d: Date | number): string => {
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Subscribers — {settings.clientName}</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <AdminHead title={`Subscribers — ${settings.clientName}`} />
   <style is:global>
-    body { font-family: -apple-system, Segoe UI, sans-serif; background: #f5f5f7; margin: 0; min-height: 100vh; color: #1a1a1a; }
-    .wrap { max-width: 880px; margin: 2rem auto; padding: 0 1rem; }
-    .card { background: #fff; padding: 2rem; border-radius: 12px; border-top: 4px solid var(--theme); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
-    h1 { margin: 0 0 0.25rem; font-size: 1.4rem; }
-    h2 { margin: 2rem 0 0.75rem; font-size: 1rem; color: #444; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
-    h2:first-of-type { margin-top: 1.5rem; }
-    .sub { margin: 0 0 1.5rem; color: #777; font-size: 0.9rem; }
-    .alert { padding: 0.6rem 0.8rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem; }
-    .alert.ok { background: #e7f5ec; color: #2c7a3e; }
-    .alert.err { background: #fdecec; color: #b3261e; }
-
-    .add-row { display: flex; gap: 0.5rem; }
-    .add-row input[type="email"] {
-      flex: 1; padding: 0.55rem 0.75rem; border: 1px solid #ddd; border-radius: 6px;
-      font-size: 0.95rem; box-sizing: border-box; font-family: inherit;
-    }
-    .add-row button {
-      padding: 0.55rem 1.1rem; background: var(--theme); color: #fff; border: none;
-      border-radius: 6px; font-size: 0.9rem; cursor: pointer; font-weight: 500;
-    }
-
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { text-align: left; padding: 0.65rem 0.5rem; border-bottom: 1px solid #eee; }
-    th { font-size: 0.75rem; color: #666; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
-    td.email { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+    .add-row { display: flex; gap: 0.6rem; }
+    .add-row input[type="email"] { flex: 1; }
+    td.email { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.85rem; color: var(--ink); }
     td.actions { text-align: right; white-space: nowrap; }
-    td.actions form { display: inline; margin-left: 0.4rem; }
+    td.actions form { display: inline; margin-left: 0.9rem; }
     td.actions button {
-      padding: 0.3rem 0.6rem; font-size: 0.78rem; background: #fff; color: #444;
-      border: 1px solid #ddd; border-radius: 5px; cursor: pointer;
+      padding: 0.3rem 0; background: none; border: none; border-bottom: 1px solid transparent;
+      color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; cursor: pointer; transition: color 0.2s, border-color 0.2s;
     }
-    td.actions button:hover { border-color: var(--theme); color: var(--theme); }
-    td.actions button.danger:hover { border-color: #b3261e; color: #b3261e; }
-    .badge {
-      display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
-      font-size: 0.72rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em;
-    }
-    .badge.active { background: #e7f5ec; color: #2c7a3e; }
-    .badge.unsubscribed { background: #ececef; color: #666; }
-    .empty { color: #888; font-size: 0.9rem; padding: 1rem 0; text-align: center; }
+    td.actions button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    td.actions button.danger:hover { color: #9C2F14; border-bottom-color: #9C2F14; }
+    .badge.active { color: #4F6B3A; }
+    .badge.unsubscribed { color: var(--muted); }
+    .badge.pending { color: var(--accent); }
+    .table-scroll { overflow-x: auto; }
   </style>
 </head>
 <body style={`--theme: ${themeColor}`}>
   <AdminAppbar current="subscribers" />
   <div class="wrap">
     <div class="card">
-      <h1>Subscribers</h1>
-      <p class="sub">Manage who receives published posts. Adding an existing email reactivates an unsubscribed entry.</p>
+      <header class="page-head">
+        <span class="eyebrow">The mailing list</span>
+        <h1>Subscribers</h1>
+        <p class="sub">Manage who receives published posts. Adding an existing email reactivates an unsubscribed entry.</p>
+      </header>
 
       {saved && <div class="alert ok">Saved.</div>}
       {error && <div class="alert err">{error}</div>}
@@ -87,7 +65,7 @@ const fmt = (d: Date | number): string => {
       {rows.length === 0 ? (
         <div class="empty">No subscribers yet.</div>
       ) : (
-        <table>
+        <div class="table-scroll"><table>
           <thead>
             <tr>
               <th>Email</th>
@@ -120,7 +98,7 @@ const fmt = (d: Date | number): string => {
               );
             })}
           </tbody>
-        </table>
+        </table></div>
       )}
     </div>
   </div>

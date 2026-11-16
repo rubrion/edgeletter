@@ -1,0 +1,19 @@
+---
+import '../styles/admin.css';
+import { Font } from 'astro:assets';
+
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>{title}</title>
+<link rel="icon" href="/favicon.ico" />
+<Font cssVariable="--font-display" preload />
+<Font cssVariable="--font-script" />
+<Font cssVariable="--font-body" preload />

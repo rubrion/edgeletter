@@ -1,0 +1,193 @@
+/*
+ * EdgeLetter — Tactile Editorial Stationery design tokens.
+ *
+ * Shared by the public site (global.css), the admin panel (admin.css) and
+ * the embed widget. Tenant-controlled colors (--theme-primary, --bg-body,
+ * --black, --gray-*) are injected by BaseHead.astro; everything here derives
+ * from them so a tenant override still produces a coherent palette.
+ */
+:root {
+	/* Fallbacks — overridden per tenant by BaseHead's themeCss */
+	--theme-primary: #B44A27;
+	--accent: var(--theme-primary);
+	--bg-body: #E7E4DE;
+	--bg-header: #F5F3EE;
+	--black: 42, 35, 29;
+	--gray-dark: 58, 49, 41;
+	--gray: 122, 110, 98;
+	--gray-light: 216, 211, 202;
+
+	/* Stationery surfaces */
+	--paper: var(--bg-body);
+	--card: #F5F3EE;
+	--ink: rgb(var(--black));
+	--text: rgb(var(--gray-dark));
+	--muted: rgb(var(--gray));
+	--accent-deep: color-mix(in srgb, var(--accent) 45%, #000);
+	--on-accent: #F5F3EE;
+	--hairline-color: rgba(42, 35, 29, 0.12);
+	--hairline: 1px solid var(--hairline-color);
+	--shadow-paper: 0 4px 12px rgba(35, 25, 15, 0.08);
+	--shadow-lift: 0 12px 24px rgba(35, 25, 15, 0.14);
+	--shadow-pocket: inset 0 2px 6px rgba(0, 0, 0, 0.18);
+	--grain-opacity: 0.04;
+	--deboss-shadow: 0 1px 0 rgba(255, 255, 255, 0.14), 0 -1px 0 rgba(0, 0, 0, 0.2);
+
+	/* Type */
+	--font-display-stack: var(--font-display, 'Instrument Serif'), 'Cormorant Garamond', Georgia, serif;
+	--font-script-stack: var(--font-script, 'Pinyon Script'), 'Snell Roundhand', cursive;
+	--font-body-stack: var(--font-body, 'Newsreader'), Georgia, 'Times New Roman', serif;
+
+	accent-color: var(--accent);
+	color-scheme: light;
+}
+
+/* Espresso dark variant */
+html[data-theme="dark"] {
+	--card: #241E19;
+	--on-accent: #F5F3EE;
+	--hairline-color: rgba(245, 243, 238, 0.1);
+	--shadow-paper: 0 4px 12px rgba(0, 0, 0, 0.35);
+	--shadow-lift: 0 14px 28px rgba(0, 0, 0, 0.5);
+	--grain-opacity: 0.06;
+	--accent-deep: color-mix(in srgb, var(--accent) 40%, #000);
+	color-scheme: dark;
+}
+
+/* Paper grain overlay */
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	pointer-events: none;
+	opacity: var(--grain-opacity);
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16  0 0 0 0 0.13  0 0 0 0 0.11  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+html[data-theme="dark"] body::before { mix-blend-mode: screen; }
+
+/* ---------- Utilities ---------- */
+
+/* Uppercase serif micro-copy */
+.micro {
+	font-family: var(--font-body-stack);
+	font-size: 11.5px;
+	font-weight: 500;
+	letter-spacing: 0.15em;
+	text-transform: uppercase;
+	line-height: 1.4;
+}
+.bracket::before { content: '[\00a0'; }
+.bracket::after { content: '\00a0]'; }
+
+/* Script eyebrow above major headings */
+.eyebrow {
+	display: block;
+	font-family: var(--font-script-stack);
+	font-weight: 400;
+	font-size: 1.9rem;
+	line-height: 1;
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--accent);
+	text-align: center;
+	margin: 0 0 0.35rem;
+}
+
+.display {
+	font-family: var(--font-display-stack);
+	font-weight: 400;
+	letter-spacing: -0.02em;
+	line-height: 1.05;
+}
+
+/* Ivory cotton cardstock */
+.card {
+	background: var(--card);
+	border: var(--hairline);
+	border-radius: 0;
+	box-shadow: var(--shadow-paper);
+}
+
+/* Terracotta envelope pocket with angled flap edge */
+.pocket {
+	position: relative;
+	background: var(--accent);
+	color: var(--accent-deep);
+	clip-path: polygon(0 28px, 50% 0, 100% 28px, 100% 100%, 0 100%);
+	box-shadow: var(--shadow-pocket);
+}
+.deboss {
+	color: var(--accent-deep);
+	text-shadow: var(--deboss-shadow);
+}
+
+/* Tactile hover: card slides up out of its pocket */
+.lift {
+	transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.28s ease;
+}
+.lift:hover,
+.lift:focus-within {
+	transform: translateY(-4px);
+	box-shadow: var(--shadow-lift);
+}
+@media (prefers-reduced-motion: reduce) {
+	.lift { transition: none; }
+	.lift:hover, .lift:focus-within { transform: none; }
+}
+
+/* Ornamental rule */
+.ornament {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.9rem;
+	color: var(--accent);
+	font-size: 0.8rem;
+	margin: 1.25rem auto;
+}
+.ornament::before,
+.ornament::after {
+	content: '';
+	width: 3.5rem;
+	border-top: 1px solid currentColor;
+	opacity: 0.6;
+}
+
+/* Sharp, editorial buttons */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5em;
+	padding: 0.85em 1.6em;
+	border: 1px solid var(--ink);
+	border-radius: 0;
+	background: var(--ink);
+	color: var(--card);
+	font-family: var(--font-body-stack);
+	font-size: 11.5px;
+	font-weight: 600;
+	letter-spacing: 0.15em;
+	text-transform: uppercase;
+	cursor: pointer;
+	text-decoration: none;
+	transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+}
+.btn:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn.secondary { background: transparent; color: var(--ink); }
+.btn.secondary:hover { background: var(--ink); color: var(--card); border-color: var(--ink); }
+
+.sr-only {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	position: absolute !important;
+	height: 1px;
+	width: 1px;
+	overflow: hidden;
+	clip: rect(1px, 1px, 1px, 1px);
+	clip-path: inset(50%);
+	white-space: nowrap;
+}

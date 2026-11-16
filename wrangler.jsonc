@@ -25,7 +25,7 @@
 		"PLATFORM_DOMAIN": "edgeletter.blog",
 		"MAIL_FROM_DOMAIN": "mail.edgeletter.blog",
 		"CUSTOM_DOMAIN_TARGET": "customers.edgeletter.blog",
-		"CF_ZONE_ID": "",
+		"CF_ZONE_ID": "b7982b3858faae64fb1485148a45e60e",
 		"MEDIA_PUBLIC_BASE": "https://media.rubrion.ai",
 		"TURNSTILE_SITE_KEY": "0x4AAAAAADMKgjDCOeL0zVJj",
 	},

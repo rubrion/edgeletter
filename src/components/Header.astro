@@ -2,6 +2,7 @@
 import { getLang, useTranslations } from '../i18n';
 import { loadSettings } from '../lib/settings';
 import HeaderLink from './HeaderLink.astro';
+import LogoMark from './LogoMark.astro';
 
 const settings = await loadSettings();
 const clientName = settings.clientName;
@@ -16,7 +17,14 @@ const langLabel = lang === 'en' ? 'PT' : 'EN';
 <header>
 	<nav>
 		<a href="/" class="wordmark">
-			{logoUrl ? <img src={logoUrl} alt={clientName} class="logo" /> : clientName}
+			{logoUrl ? (
+				<img src={logoUrl} alt={clientName} class="logo" />
+			) : (
+				<>
+					<LogoMark size={30} class="mark" />
+					<span>{clientName}</span>
+				</>
+			)}
 		</a>
 		<div class="internal-links">
 			<HeaderLink href="/">{t('nav.home')}</HeaderLink>
@@ -84,6 +92,9 @@ const langLabel = lang === 'en' ? 'PT' : 'EN';
 	}
 	.wordmark {
 		justify-self: start;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.7rem;
 		font-family: var(--font-display-stack);
 		font-size: 1.65rem;
 		letter-spacing: -0.02em;
@@ -92,6 +103,8 @@ const langLabel = lang === 'en' ? 'PT' : 'EN';
 		text-decoration: none;
 	}
 	.wordmark:hover { color: var(--accent); }
+	.mark { flex: none; display: block; box-shadow: var(--shadow-paper); transition: transform 0.25s ease; }
+	.wordmark:hover .mark { transform: translateY(-2px); }
 	.logo {
 		height: 2rem;
 		width: auto;

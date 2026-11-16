@@ -1,5 +1,6 @@
 ---
 import { loadSettings } from '../lib/settings';
+import LogoMark from './LogoMark.astro';
 
 interface Props {
   current?: 'posts' | 'subscribers' | 'widget' | 'settings';
@@ -20,7 +21,7 @@ const links: { key: NonNullable<Props['current']>; href: string; label: string }
 ---
 
 <nav class="admin-appbar" style={`--theme: ${themeColor}`}>
-  <a href="/admin" class="brand">{clientName}<span class="brand-sub">Studio</span></a>
+  <a href="/admin" class="brand"><LogoMark size={26} class="mark" />{clientName}<span class="brand-sub">Studio</span></a>
   <div class="links">
     {links.map((l) => (
       <a href={l.href} class:list={['nav-link', current === l.key && 'active']}>{l.label}</a>
@@ -64,6 +65,8 @@ const links: { key: NonNullable<Props['current']>; href: string; label: string }
     text-decoration: none;
   }
   .brand:hover { color: var(--ink); }
+  .brand { align-items: center; }
+  .brand .mark { flex: none; display: block; box-shadow: var(--shadow-paper); }
   .brand-sub {
     font-family: var(--font-script-stack);
     font-size: 1.15rem;

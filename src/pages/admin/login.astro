@@ -1,5 +1,6 @@
 ---
 import AdminHead from '../../components/AdminHead.astro';
+import LogoMark from '../../components/LogoMark.astro';
 import { loadSettings } from '../../lib/settings';
 
 const error = Astro.url.searchParams.get('error');
@@ -36,6 +37,7 @@ const clientName = settings.clientName;
       padding: 2.25rem 2rem 2rem;
       text-align: center;
     }
+    .login-mark { display: block; margin: 0 auto 1rem; box-shadow: var(--shadow-paper); }
     .login h1 { font-size: 2.2rem; margin-bottom: 0.25rem; }
     .login .micro { color: var(--muted); margin: 0 0 1.75rem; }
     .login label { text-align: left; }
@@ -47,6 +49,7 @@ const clientName = settings.clientName;
   <div class="envelope pocket">
     <span class="envelope-mark deboss" aria-hidden="true">Private correspondence</span>
     <form class="login card lift" method="POST" action="/api/admin/login">
+      <LogoMark size={44} class="login-mark" />
       <h1>{clientName}</h1>
       <p class="micro bracket">Editor's desk</p>
       <label for="key">Master admin key</label>

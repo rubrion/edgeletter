@@ -76,6 +76,9 @@ const [featured, ...rest] = recent;
 	}
 
 	.latest {
+		/* The debossed label sits at top: 3rem; cards start just below its
+		   baseline so the letters are never covered, at any width. */
+		--label-size: clamp(4rem, 14vw, 11rem);
 		padding: 6rem 1.25rem 3.5rem;
 	}
 	.pocket-label {
@@ -88,7 +91,7 @@ const [featured, ...rest] = recent;
 		font-weight: var(--display-weight);
 		word-spacing: var(--display-words);
 		font-style: italic;
-		font-size: clamp(4rem, 14vw, 11rem);
+		font-size: var(--label-size);
 		line-height: 1;
 		letter-spacing: var(--display-tracking);
 		pointer-events: none;
@@ -100,7 +103,7 @@ const [featured, ...rest] = recent;
 		max-width: 880px;
 		margin: 0 auto;
 	}
-	.featured-wrap { margin-top: 5.5rem; }
+	.featured-wrap { margin-top: calc(var(--label-size) - 0.75rem); }
 	.post-grid {
 		list-style: none;
 		padding: 0;
@@ -127,6 +130,6 @@ const [featured, ...rest] = recent;
 	@media (max-width: 640px) {
 		.post-grid { grid-template-columns: 1fr; }
 		.latest { padding: 5rem 1rem 2.5rem; }
-		.featured-wrap { margin-top: 3.5rem; }
+		.featured-wrap { margin-top: calc(var(--label-size) - 0.5rem); }
 	}
 </style>

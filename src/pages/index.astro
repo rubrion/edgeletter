@@ -1,12 +1,11 @@
 ---
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
-import FormattedDate from '../components/FormattedDate.astro';
 import Header from '../components/Header.astro';
 import { getLang, useTranslations } from '../i18n';
 import { loadSettings } from '../lib/settings';
-import { getDbInstance, posts } from '../db';
-import { and, desc, eq } from 'drizzle-orm';
+import PostCard from '../components/PostCard.astro';
+import { listPosts } from '../lib/post-lists';
 
 const lang = getLang(Astro.request);
 const t = useTranslations(lang);
@@ -16,23 +15,7 @@ const clientName = settings.clientName;
 const description = `Latest from ${clientName}.`;
 const tagline = settings.clientTagline || 'Notes, essays, and announcements — straight to your inbox.';
 
-const db = getDbInstance();
-const recent = await db
-	.select({ slug: posts.slug, title: posts.title, publishedAt: posts.publishedAt, contentMd: posts.contentMd })
-	.from(posts)
-	.where(and(eq(posts.publicationId, Astro.locals.publication.id), eq(posts.isPublished, true)))
-	.orderBy(desc(posts.publishedAt))
-	.limit(5);
-
-const excerpt = (md: string) =>
-	md
-		.replace(/^#+\s+.*$/gm, '')
-		.replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-		.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-		.replace(/[#*_`>]/g, '')
-		.replace(/\s+/g, ' ')
-		.trim()
-		.slice(0, 180);
+const recent = await listPosts(Astro.locals.publication.id, lang, 5);
 
 const [featured, ...rest] = recent;
 ---
@@ -57,25 +40,13 @@ const [featured, ...rest] = recent;
 				<span class="pocket-label deboss reveal" aria-hidden="true">{t('index.latestLabel')}</span>
 				<h2 id="latest-heading" class="sr-only">{t('index.latestPosts')}</h2>
 				<div class="stack">
-					<a href={`/blog/${featured.slug}`} class="post-card featured card lift reveal from-pocket" style="--i: 1">
-						<span class="micro bracket badge">{t('index.featured')}</span>
-						<span class="title">{featured.title}</span>
-						{excerpt(featured.contentMd) && <span class="excerpt">{excerpt(featured.contentMd)}…</span>}
-						{featured.publishedAt && (
-							<span class="micro date"><FormattedDate date={featured.publishedAt} lang={lang} /></span>
-						)}
-					</a>
+					<div class="featured-wrap">
+						<PostCard post={featured} lang={lang} variant="feature" badge={t('index.featured')} i={1} />
+					</div>
 					{rest.length > 0 && (
 						<ul class="post-grid">
 							{rest.map((p, i) => (
-								<li>
-									<a href={`/blog/${p.slug}`} class="post-card card lift reveal from-pocket" style={`--i: ${(i % 2) + 1}`}>
-										{p.publishedAt && (
-											<span class="micro date"><FormattedDate date={p.publishedAt} lang={lang} /></span>
-										)}
-										<span class="title">{p.title}</span>
-									</a>
-								</li>
+								<li><PostCard post={p} lang={lang} i={(i % 2) + 1} /></li>
 							))}
 						</ul>
 					)}
@@ -129,46 +100,7 @@ const [featured, ...rest] = recent;
 		max-width: 880px;
 		margin: 0 auto;
 	}
-	.post-card {
-		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
-		padding: 1.6rem 1.75rem;
-		color: var(--text);
-		text-decoration: none;
-		height: 100%;
-		box-sizing: border-box;
-	}
-	.post-card:hover { color: var(--text); }
-	.post-card .title {
-		font-family: var(--font-display-stack);
-		font-weight: var(--display-weight);
-		word-spacing: var(--display-words);
-		font-size: 1.65rem;
-		line-height: 1.08;
-		letter-spacing: var(--display-tracking);
-		color: var(--ink);
-		transition: color 0.2s;
-	}
-	.post-card:hover .title { color: var(--accent); }
-	.post-card .date { color: var(--muted); }
-
-	.featured {
-		align-items: center;
-		text-align: center;
-		padding: 2.75rem 2.5rem 2.25rem;
-		margin-top: 5.5rem;
-	}
-	.featured .badge { color: var(--accent); }
-	.featured .title { font-size: clamp(2rem, 5vw, 3rem); max-width: 18em; }
-	.featured .excerpt {
-		max-width: 36em;
-		font-style: italic;
-		color: var(--muted);
-		font-size: 1rem;
-		line-height: 1.6;
-	}
-
+	.featured-wrap { margin-top: 5.5rem; }
 	.post-grid {
 		list-style: none;
 		padding: 0;
@@ -178,6 +110,8 @@ const [featured, ...rest] = recent;
 		gap: 1.25rem;
 	}
 	/* Odd count: last card spans the full row instead of sitting alone */
+	.post-grid li { display: flex; }
+	.post-grid li > :global(a) { flex: 1; }
 	.post-grid li:last-child:nth-child(odd) { grid-column: 1 / -1; }
 	.all {
 		text-align: center;
@@ -193,6 +127,6 @@ const [featured, ...rest] = recent;
 	@media (max-width: 640px) {
 		.post-grid { grid-template-columns: 1fr; }
 		.latest { padding: 5rem 1rem 2.5rem; }
-		.featured { margin-top: 3.5rem; padding: 2rem 1.25rem 1.75rem; }
+		.featured-wrap { margin-top: 3.5rem; }
 	}
 </style>

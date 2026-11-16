@@ -21,9 +21,17 @@ export type Limits = {
 const MB = 1024 * 1024;
 export const PROBATION_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Sized so a writer at the cap never costs more than the plan brings in:
+// email (~$0.35–0.90 per 1,000 at Resend) dominates; see docs on pricing.
 export const PLAN_LIMITS = {
-  free: { subscribers: 1_000, emailsPerMonth: 4_000, mediaBytes: 200 * MB, aiTokensPerDay: 5_000, customDomain: false, watermark: true },
-  pro: { subscribers: 25_000, emailsPerMonth: 100_000, mediaBytes: 5 * 1024 * MB, aiTokensPerDay: 30_000, customDomain: true, watermark: false },
+  free: { subscribers: 500, emailsPerMonth: 2_000, mediaBytes: 200 * MB, aiTokensPerDay: 5_000, customDomain: false, watermark: true },
+  pro: { subscribers: 2_500, emailsPerMonth: 10_000, mediaBytes: 2 * 1024 * MB, aiTokensPerDay: 30_000, customDomain: true, watermark: false },
+} as const;
+
+/** Launch price (locked for early subscribers: existing Stripe subscriptions keep their price). */
+export const PRO_PRICE = {
+  monthly: { brl: 'R$29', usd: 'US$7' },
+  yearly: { brl: 'R$290', usd: 'US$70' },
 } as const;
 export const PROBATION_EMAILS_PER_MONTH = 500;
 

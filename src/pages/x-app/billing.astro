@@ -1,7 +1,7 @@
 ---
 import AppLayout from '../../layouts/AppLayout.astro';
-import { emailsThisMonth, formatBytes, limitsFor, mediaBytesUsed, PLAN_LIMITS, subscriberCount } from '../../lib/plans';
-import { stripeEnabled } from '../../lib/stripe';
+import { emailsThisMonth, formatBytes, limitsFor, mediaBytesUsed, PLAN_LIMITS, PRO_PRICE, subscriberCount } from '../../lib/plans';
+import { stripeEnabled, yearlyEnabled } from '../../lib/stripe';
 
 const { publication } = Astro.locals as Required<App.Locals>;
 const limits = limitsFor(publication);
@@ -45,9 +45,19 @@ const pro = publication.plan === 'pro';
 					<dt>Domain</dt><dd>Your own domain</dd>
 					<dt>Branding</dt><dd>No EdgeLetter watermark</dd>
 				</dl>
-				<form method="post" action="/api/billing/checkout" style="margin-top:1.5rem">
-					<button type="submit" disabled={!stripeEnabled()}>{stripeEnabled() ? 'Upgrade to Pro' : 'Upgrades open soon'}</button>
-				</form>
+				<p style="margin:1.5rem 0 0.25rem"><strong>{PRO_PRICE.monthly.brl}/month</strong> <span class="muted">({PRO_PRICE.monthly.usd} outside Brazil) · launch price, kept for as long as you stay subscribed</span></p>
+				<div class="row" style="margin-top:1rem">
+					<form method="post" action="/api/billing/checkout" class="inline-form">
+						<input type="hidden" name="interval" value="month" />
+						<button type="submit" disabled={!stripeEnabled()}>{stripeEnabled() ? 'Upgrade — monthly' : 'Upgrades open soon'}</button>
+					</form>
+					{yearlyEnabled() && (
+						<form method="post" action="/api/billing/checkout" class="inline-form">
+							<input type="hidden" name="interval" value="year" />
+							<button type="submit">Yearly — {PRO_PRICE.yearly.brl} ({PRO_PRICE.yearly.usd}), 2 months free</button>
+						</form>
+					)}
+				</div>
 			</>
 		)}
 	</div>

@@ -5,10 +5,18 @@ import { env } from 'cloudflare:workers';
  * customer portal, and webhook signature verification.
  */
 
-type StripeEnv = { STRIPE_SECRET_KEY?: string; STRIPE_PRICE_PRO?: string; STRIPE_WEBHOOK_SECRET?: string; STRIPE_PORTAL_CONFIG?: string };
+type StripeEnv = {
+  STRIPE_SECRET_KEY?: string;
+  /** Monthly Pro price; BRL with a USD currency option (Checkout localizes). */
+  STRIPE_PRICE_PRO?: string;
+  STRIPE_PRICE_PRO_YEARLY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PORTAL_CONFIG?: string;
+};
 const cfg = () => env as unknown as StripeEnv;
 
 export const stripeEnabled = (): boolean => !!cfg().STRIPE_SECRET_KEY && !!cfg().STRIPE_PRICE_PRO;
+export const yearlyEnabled = (): boolean => stripeEnabled() && !!cfg().STRIPE_PRICE_PRO_YEARLY;
 
 /** Stripe's form encoding: nested keys as a[b][c]=v. */
 const form = (obj: Record<string, unknown>, prefix = ''): string[] =>
@@ -35,6 +43,7 @@ const call = async <T>(path: string, body: Record<string, unknown>): Promise<T> 
 
 export const createCheckout = (input: {
   publicationId: string;
+  interval: 'month' | 'year';
   customerId: string | null;
   email: string;
   successUrl: string;
@@ -42,7 +51,7 @@ export const createCheckout = (input: {
 }) =>
   call<{ url: string }>('checkout/sessions', {
     mode: 'subscription',
-    'line_items[0][price]': cfg().STRIPE_PRICE_PRO,
+    'line_items[0][price]': input.interval === 'year' && cfg().STRIPE_PRICE_PRO_YEARLY ? cfg().STRIPE_PRICE_PRO_YEARLY : cfg().STRIPE_PRICE_PRO,
     'line_items[0][quantity]': 1,
     client_reference_id: input.publicationId,
     ...(input.customerId ? { customer: input.customerId } : { customer_email: input.email }),

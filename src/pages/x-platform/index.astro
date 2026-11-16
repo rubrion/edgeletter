@@ -1,7 +1,7 @@
 ---
 import PlatformLayout from '../../layouts/PlatformLayout.astro';
 import { excerptOf, recentListedPosts } from '../../lib/discovery';
-import { PLAN_LIMITS } from '../../lib/plans';
+import { PLAN_LIMITS, PRO_PRICE } from '../../lib/plans';
 import { platformOrigin, publicationOrigin } from '../../lib/tenant';
 
 const app = platformOrigin(Astro.url, 'app');
@@ -51,8 +51,8 @@ const fmt = (d: Date | null) => (d ? d.toLocaleDateString('en-US', { month: 'sho
 	<main class="pricing">
 		<header class="head"><span class="eyebrow">Plain terms</span><h2>Free to start</h2></header>
 		<div class="plans">
-			<div class="card plan"><span class="micro bracket">Free</span><ul><li>{PLAN_LIMITS.free.subscribers.toLocaleString()} subscribers</li><li>{PLAN_LIMITS.free.emailsPerMonth.toLocaleString()} emails a month</li><li>yourname.edgeletter.blog</li></ul></div>
-			<div class="card plan featured"><span class="micro bracket">Pro</span><ul><li>{PLAN_LIMITS.pro.subscribers.toLocaleString()} subscribers</li><li>{PLAN_LIMITS.pro.emailsPerMonth.toLocaleString()} emails a month</li><li>Your own domain</li><li>No EdgeLetter watermark</li></ul></div>
+			<div class="card plan"><span class="micro bracket">Free</span><p class="price"><strong>Free</strong> <span>· forever</span></p><ul><li>{PLAN_LIMITS.free.subscribers.toLocaleString()} subscribers</li><li>{PLAN_LIMITS.free.emailsPerMonth.toLocaleString()} emails a month</li><li>yourname.edgeletter.blog</li></ul></div>
+			<div class="card plan featured"><span class="micro bracket">Pro</span><p class="price"><strong>{PRO_PRICE.monthly.brl}</strong>/month <span>· {PRO_PRICE.monthly.usd} outside Brazil</span></p><p class="launch">Launch price, kept for as long as you stay subscribed.</p><ul><li>{PLAN_LIMITS.pro.subscribers.toLocaleString()} subscribers</li><li>{PLAN_LIMITS.pro.emailsPerMonth.toLocaleString()} emails a month</li><li>Your own domain</li><li>No EdgeLetter watermark</li></ul></div>
 		</div>
 	</main>
 
@@ -77,6 +77,10 @@ const fmt = (d: Date | null) => (d ? d.toLocaleDateString('en-US', { month: 'sho
 		.plan { padding: 1.75rem; }
 		.plan.featured { border-color: var(--accent); }
 		.plan ul { margin: 0.8rem 0 0; padding-left: 1.1rem; }
+		.price { margin: 0.8rem 0 0; }
+		.price strong { font-family: var(--font-display-stack); font-weight: 500; font-size: 2rem; color: var(--ink); }
+		.price span, .launch { color: var(--muted); font-style: italic; font-size: 0.92rem; }
+		.launch { margin: 0.2rem 0 0; }
 		@media (max-width: 640px) { .posts, .plans { grid-template-columns: 1fr; } }
 	</style>
 </PlatformLayout>

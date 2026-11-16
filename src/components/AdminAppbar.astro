@@ -1,10 +1,16 @@
 ---
+/**
+ * App navigation: a left sidebar on desktop (grouped sections, publication
+ * switcher on top, account at the bottom) that collapses into a top bar
+ * with a slide-out drawer on small screens. Pages keep rendering their own
+ * content; body padding for the sidebar comes from admin.css.
+ */
 import { membershipsOf } from '../lib/auth';
 import { loadSettings } from '../lib/settings';
 import { publicationOrigin } from '../lib/tenant';
 import LogoMark from './LogoMark.astro';
 
-type Key = 'posts' | 'subscribers' | 'stats' | 'widget' | 'settings' | 'members' | 'keys' | 'import' | 'billing' | 'domain' | 'staff' | 'home';
+type Key = 'home' | 'posts' | 'subscribers' | 'stats' | 'widget' | 'settings' | 'members' | 'keys' | 'import' | 'billing' | 'domain' | 'staff';
 
 interface Props {
   current?: Key;
@@ -17,120 +23,257 @@ const settings = publication ? await loadSettings(publication.id) : null;
 const themeColor = settings?.themePrimaryColor ?? '#B44A27';
 const mine = user ? await membershipsOf(user.id) : [];
 const owner = role === 'owner';
+const siteUrl = publication ? publicationOrigin(Astro.url, publication) : null;
 
-const links: { key: Key; href: string; label: string; show: boolean }[] = [
-  { key: 'posts', href: '/admin', label: 'Posts', show: !!publication },
-  { key: 'subscribers', href: '/admin/subscribers', label: 'Subscribers', show: !!publication },
-  { key: 'stats', href: '/admin/stats', label: 'Stats', show: !!publication },
-  { key: 'settings', href: '/admin/settings', label: 'Settings', show: !!publication && owner },
-  { key: 'widget', href: '/admin/widget', label: 'Widget', show: !!publication && owner },
-  { key: 'members', href: '/members', label: 'Team', show: !!publication && owner },
-  { key: 'import', href: '/import', label: 'Import', show: !!publication && owner },
-  { key: 'keys', href: '/keys', label: 'API keys', show: !!publication && owner },
-  { key: 'domain', href: '/domain', label: 'Domain', show: !!publication && owner },
-  { key: 'billing', href: '/billing', label: 'Plan', show: !!publication && owner },
-  { key: 'staff', href: '/staff', label: 'Staff', show: !!user?.isStaff },
-];
+// Uniform-stroke pictograms (24-unit grid), matching the logo's language.
+const ICONS: Record<Key | 'new' | 'site' | 'out', string> = {
+  home: 'M4 11 12 4l8 7v9H4z M10 20v-6h4v6',
+  posts: 'M6 3h9l4 4v14H6z M14 3v5h5 M9 12h7 M9 16h7',
+  new: 'M12 5v14 M5 12h14',
+  subscribers: 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6 M16 4.5a3.5 3.5 0 0 1 0 6.5 M18 14c2 .8 3 3 3 6',
+  stats: 'M4 20V10 M10 20V4 M16 20v-7 M3 20h18',
+  import: 'M12 3v11 M7 9l5 5 5-5 M4 17v3h16v-3',
+  settings: 'M4 7h10 M18 7h2 M4 17h4 M12 17h8 M14 5v4 M8 15v4',
+  widget: 'M4 5h16v14H4z M4 9h16 M8 13h8 M8 16h5',
+  domain: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M3 12h18 M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9 M12 3C9.5 5.5 8.5 8.5 8.5 12s1 6.5 3.5 9',
+  members: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M2 20c0-3 2.7-5 6-5s6 2 6 5 M14 15.2c.6-.1 1.3-.2 2-.2 3.3 0 6 2 6 5',
+  keys: 'M8 14a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M11 11l9 9 M17 17l2-2 M15 15l2-2',
+  billing: 'M3 6h18v12H3z M3 10h18 M7 15h4',
+  staff: 'M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z M9 12l2 2 4-4',
+  site: 'M14 4h6v6 M20 4l-9 9 M18 14v6H4V6h6',
+  out: 'M15 4h5v16h-5 M10 8l-4 4 4 4 M6 12h10',
+};
+
+type Item = { key: Key; href: string; label: string };
+const groups: { title: string; items: Item[] }[] = [];
+if (publication) {
+  groups.push({
+    title: 'Write',
+    items: [
+      { key: 'home', href: '/', label: 'Overview' },
+      { key: 'posts', href: '/admin', label: 'Posts' },
+    ],
+  });
+  groups.push({
+    title: 'Audience',
+    items: [
+      { key: 'subscribers', href: '/admin/subscribers', label: 'Subscribers' },
+      { key: 'stats', href: '/admin/stats', label: 'Stats' },
+      ...(owner ? [{ key: 'import' as const, href: '/import', label: 'Import' }] : []),
+    ],
+  });
+  if (owner) {
+    groups.push({
+      title: 'Publication',
+      items: [
+        { key: 'settings', href: '/admin/settings', label: 'Settings' },
+        { key: 'widget', href: '/admin/widget', label: 'Widget' },
+        { key: 'domain', href: '/domain', label: 'Domain' },
+      ],
+    });
+    groups.push({
+      title: 'Account',
+      items: [
+        { key: 'members', href: '/members', label: 'Team' },
+        { key: 'keys', href: '/keys', label: 'API keys' },
+        { key: 'billing', href: '/billing', label: 'Plan' },
+      ],
+    });
+  }
+}
+if (user?.isStaff) groups.push({ title: 'Platform', items: [{ key: 'staff', href: '/staff', label: 'Staff' }] });
 ---
 
+<input type="checkbox" id="app-nav-toggle" class="nav-toggle" aria-hidden="true" tabindex="-1" />
+<header class="app-topbar">
+  <a href="/" class="top-brand"><LogoMark size={26} class="mark" /><span>{publication?.name ?? 'EdgeLetter'}</span></a>
+  <label for="app-nav-toggle" class="menu-btn" aria-label="Menu">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+  </label>
+</header>
+<label for="app-nav-toggle" class="scrim" aria-hidden="true"></label>
 
-<nav class="admin-appbar" style={`--theme: ${themeColor}`}>
-  <a href="/" class="brand"><LogoMark size={26} class="mark" />{publication?.name ?? 'EdgeLetter'}<span class="brand-sub">Studio</span></a>
-  {mine.length > 1 && (
-    <form method="get" action="/admin" class="switcher">
-      <label class="sr-only" for="pub-switch">Publication</label>
-      <select id="pub-switch" name="pub" onchange="this.form.submit()">
-        {mine.map((m) => <option value={m.publication.id} selected={m.publication.id === publication?.id}>{m.publication.name}</option>)}
-      </select>
-    </form>
+<aside class="app-sidebar" style={`--theme: ${themeColor}`} aria-label="Studio navigation">
+  <a href="/" class="brand"><LogoMark size={24} class="mark" /><span>EdgeLetter</span><span class="brand-sub">Studio</span></a>
+
+  {publication && (
+    <div class="pub">
+      {mine.length > 1 ? (
+        <form method="get" action="/" class="switcher">
+          <label class="sr-only" for="pub-switch">Publication</label>
+          <select id="pub-switch" name="pub" onchange="this.form.submit()">
+            {mine.map((m) => <option value={m.publication.id} selected={m.publication.id === publication.id}>{m.publication.name}</option>)}
+          </select>
+        </form>
+      ) : (
+        <span class="pub-name">{publication.name}</span>
+      )}
+      <span class="pub-meta">{role}{publication.plan === 'pro' ? ' · Pro' : ' · Free'}</span>
+      <a href="/admin" class="new-post">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.new} /></svg>New post
+      </a>
+    </div>
   )}
-  <div class="links">
-    {links.filter((l) => l.show).map((l) => (
-      <a href={l.href} class:list={['nav-link', current === l.key && 'active']}>{l.label}</a>
+
+  <nav class="groups">
+    {groups.map((g) => (
+      <div class="group">
+        <span class="group-title">{g.title}</span>
+        {g.items.map((it) => (
+          <a href={it.href} class:list={['item', current === it.key && 'active']} aria-current={current === it.key ? 'page' : undefined}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS[it.key]} /></svg>
+            {it.label}
+          </a>
+        ))}
+      </div>
     ))}
+  </nav>
+
+  <div class="foot">
+    {siteUrl && (
+      <a href={siteUrl} class="item" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.site} /></svg>View site
+      </a>
+    )}
+    {mine.length > 0 && <a href="/onboarding" class="item subtle">+ New publication</a>}
+    {user && <span class="who" title={user.email}>{user.email}</span>}
+    <form method="post" action="/signout" class="signout-form">
+      <button type="submit" class="item signout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.out} /></svg>Sign out</button>
+    </form>
   </div>
-  {publication && <a href={publicationOrigin(Astro.url, publication)} class="nav-link view" target="_blank" rel="noopener">View site ↗</a>}
-  <form method="post" action="/signout" class="signout-form"><button type="submit" class="signout">Sign out</button></form>
-</nav>
+</aside>
 
 <style>
-  .admin-appbar {
-    view-transition-name: admin-bar;
+  .app-sidebar {
     --accent: var(--theme);
-    position: relative;
-    z-index: 5;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    width: var(--sidebar-w, 248px);
+    box-sizing: border-box;
     display: flex;
-    align-items: center;
-    gap: 2rem;
-    padding: 0 1.75rem;
-    min-height: 3.75rem;
+    flex-direction: column;
+    gap: 1.1rem;
+    padding: 1.25rem 0.9rem 1rem;
     background: var(--card);
-    border-bottom: var(--hairline);
+    border-right: var(--hairline);
     box-shadow: var(--shadow-paper);
+    overflow-y: auto;
+    view-transition-name: admin-bar;
   }
   .brand {
     display: flex;
-    align-items: baseline;
-    gap: 0.6rem;
-    font-family: var(--font-display-stack);
-    font-weight: var(--display-weight);
-    word-spacing: var(--display-words);
-    font-size: 1.5rem;
-    letter-spacing: var(--display-tracking);
-    line-height: 1;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0 0.5rem;
     color: var(--ink);
     text-decoration: none;
+    font-family: var(--font-display-stack);
+    font-weight: var(--display-weight);
+    font-size: 1.3rem;
   }
-  .brand:hover { color: var(--ink); }
-  .brand { align-items: center; }
-  .brand .mark { flex: none; display: block; box-shadow: var(--shadow-paper); }
-  .brand-sub {
-    font-family: var(--font-eyebrow-stack);
-    font-style: italic;
-    font-weight: 500;
-    font-size: 1.15rem;
-    letter-spacing: 0;
-    color: var(--accent);
-  }
-  .links {
+  .brand .mark { flex: none; box-shadow: var(--shadow-paper); }
+  .brand-sub { font-family: var(--font-eyebrow-stack); font-style: italic; font-weight: 500; font-size: 1rem; color: var(--accent); }
+
+  .pub {
     display: flex;
-    gap: 1.75rem;
-    flex: 1;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.85rem 0.75rem 0.9rem;
+    border: var(--hairline);
+    background: #FBFAF7;
   }
-  .nav-link, .signout {
-    position: relative;
-    padding: 0.4rem 0;
-    color: var(--muted);
+  .pub-name {
+    font-family: var(--font-display-stack);
+    font-weight: var(--display-weight);
+    font-size: 1.15rem;
+    line-height: 1.2;
+    color: var(--ink);
+  }
+  .switcher { margin: 0; }
+  .switcher select { width: 100%; padding: 0.4rem 1.8rem 0.4rem 0.5rem; font-size: 0.92rem; }
+  .pub-meta { font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .new-post {
+    margin-top: 0.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--ink);
+    color: var(--card);
     text-decoration: none;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.15em;
     text-transform: uppercase;
-    transition: color 0.2s;
+    transition: background-color 0.2s;
   }
-  .nav-link::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-bottom: 1px solid var(--accent);
-    transform: scaleX(0);
-    transition: transform 0.25s ease;
-  }
-  .nav-link:hover, .nav-link.active { color: var(--accent); }
-  .nav-link:hover::after, .nav-link.active::after { transform: scaleX(1); }
-  .signout::before { content: '[\00a0'; }
-  .signout::after { content: '\00a0]'; }
-  .signout:hover { color: var(--accent); }
-  .signout-form { margin: 0; }
-  button.signout { background: none; border: none; padding: 0.4rem 0; cursor: pointer; font-family: inherit; }
-  .switcher { margin: 0; }
-  .switcher select { width: auto; padding: 0.35rem 2rem 0.35rem 0.6rem; font-size: 0.85rem; }
-  .view { white-space: nowrap; }
+  .new-post:hover { background: var(--accent); color: var(--on-accent); }
+  .new-post svg { width: 15px; height: 15px; stroke: currentColor; }
 
-  @media (max-width: 720px) {
-    .admin-appbar { flex-wrap: wrap; gap: 0.5rem 1.25rem; padding: 0.75rem 1rem; }
-    .links { order: 3; flex-basis: 100%; gap: 1.25rem; overflow-x: auto; }
+  .groups { display: flex; flex-direction: column; gap: 1rem; flex: 1; }
+  .group { display: flex; flex-direction: column; gap: 0.1rem; }
+  .group-title {
+    padding: 0 0.6rem 0.3rem;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.5rem 0.6rem;
+    border-left: 2px solid transparent;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .item:hover { background: rgba(var(--gray-light), 0.45); color: var(--ink); }
+  .item.active { background: color-mix(in srgb, var(--accent) 9%, transparent); border-left-color: var(--accent); color: var(--accent); }
+  .item svg, .new-post svg {
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .item svg { width: 18px; height: 18px; opacity: 0.85; }
+
+  .foot { display: flex; flex-direction: column; gap: 0.1rem; padding-top: 0.75rem; border-top: var(--hairline); }
+  .subtle { font-size: 0.85rem; color: var(--muted); }
+  .who { padding: 0.55rem 0.6rem 0.2rem; font-size: 0.78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .signout-form { margin: 0; }
+  button.signout { width: 100%; background: none; border: 0; border-left: 2px solid transparent; cursor: pointer; font: inherit; font-size: 0.95rem; text-transform: none; letter-spacing: 0; color: var(--text); }
+  button.signout:hover { background: rgba(var(--gray-light), 0.45); color: #9C2F14; }
+
+  /* Small screens: top bar + slide-out drawer */
+  .nav-toggle, .app-topbar, .scrim { display: none; }
+  @media (max-width: 900px) {
+    .app-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.6rem 1rem;
+      background: var(--card);
+      border-bottom: var(--hairline);
+      box-shadow: var(--shadow-paper);
+    }
+    .top-brand { display: flex; align-items: center; gap: 0.55rem; color: var(--ink); text-decoration: none; font-family: var(--font-display-stack); font-weight: 500; font-size: 1.15rem; min-width: 0; }
+    .top-brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .menu-btn { display: grid; place-items: center; width: 40px; height: 40px; cursor: pointer; }
+    .menu-btn svg { fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
+    .app-sidebar { transform: translateX(-105%); transition: transform 0.25s ease; width: min(84vw, 300px); }
+    .nav-toggle:checked ~ .app-sidebar { transform: none; }
+    .nav-toggle:checked ~ .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(42, 35, 29, 0.35); }
   }
 </style>

@@ -170,9 +170,11 @@ const [featured, ...rest] = recent;
 		padding: 0;
 		margin: 1.25rem 0 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 1.25rem;
 	}
+	/* Odd count: last card spans the full row instead of sitting alone */
+	.post-grid li:last-child:nth-child(odd) { grid-column: 1 / -1; }
 	.all {
 		text-align: center;
 		margin: 2.5rem 0 0;
@@ -185,6 +187,7 @@ const [featured, ...rest] = recent;
 	.all .btn:hover { background: var(--ink); color: var(--card); border-color: var(--ink); }
 
 	@media (max-width: 640px) {
+		.post-grid { grid-template-columns: 1fr; }
 		.latest { padding: 5rem 1rem 2.5rem; }
 		.featured { margin-top: 3.5rem; padding: 2rem 1.25rem 1.75rem; }
 	}

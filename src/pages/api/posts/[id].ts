@@ -1,8 +1,8 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { and, eq } from "drizzle-orm";
-import { mediaPrefix } from "../../../lib/tenant";
-import { getDbInstance, campaigns, posts } from "../../../db";
+import { mediaPrefixes } from "../../../lib/tenant";
+import { getDbInstance, campaigns, mediaObjects, posts } from "../../../db";
 
 const extractOwnedMediaKeys = (
   md: string,
@@ -37,15 +37,14 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
   const e = env as unknown as {
     MEDIA?: R2Bucket;
     MEDIA_PUBLIC_BASE?: string;
-    CLIENT_SLUG?: string;
   };
-  const keys = extractOwnedMediaKeys(
-    post.contentMd,
-    (e.MEDIA_PUBLIC_BASE ?? "").replace(/\/$/, ""),
-    mediaPrefix(publicationId),
+  const base = (e.MEDIA_PUBLIC_BASE ?? "").replace(/\/$/, "");
+  const keys = mediaPrefixes(locals.publication).flatMap((prefix) =>
+    extractOwnedMediaKeys(post.contentMd, base, prefix),
   );
   if (e.MEDIA && keys.length > 0) {
     await Promise.allSettled(keys.map((k) => e.MEDIA!.delete(k)));
+    for (const key of keys) await db.delete(mediaObjects).where(eq(mediaObjects.key, key));
   }
 
   // Drop campaigns first to satisfy the FK; then the post itself.

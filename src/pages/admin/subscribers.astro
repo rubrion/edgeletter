@@ -17,6 +17,9 @@ const rows = await db
 
 const saved = Astro.url.searchParams.get('saved') === '1';
 const error = Astro.url.searchParams.get('error');
+const imported = Astro.url.searchParams.get('imported');
+const skippedN = Astro.url.searchParams.get('skipped');
+const capped = Astro.url.searchParams.get('capped') === '1';
 
 const fmt = (d: Date | number): string => {
   const date = typeof d === 'number' ? new Date(d) : d;
@@ -44,6 +47,11 @@ const fmt = (d: Date | number): string => {
     .badge.unsubscribed { color: var(--muted); }
     .badge.pending { color: var(--accent); }
     .table-scroll { overflow-x: auto; }
+    .import-form { display: grid; gap: 0.75rem; }
+    .consent { display: flex; gap: 0.5rem; align-items: center; font-size: 0.95rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text); margin: 0; }
+    .io-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .secondary-btn { background: transparent !important; color: var(--ink) !important; }
+    .secondary-btn:hover { background: var(--ink) !important; color: var(--card) !important; }
   </style>
 </head>
 <body style={`--theme: ${themeColor}`}>
@@ -63,6 +71,21 @@ const fmt = (d: Date | number): string => {
       <form method="POST" action="/api/admin/subscribers" class="add-row">
         <input type="email" name="email" placeholder="someone@example.com" required autocomplete="off" />
         <button type="submit">Add</button>
+      </form>
+
+      <h2>Import &amp; export</h2>
+      {imported !== null && (
+        <div class:list={['alert', capped ? 'err' : 'ok']}>
+          Imported {imported}, skipped {skippedN} (already on the list, suppressed, duplicate or invalid){capped && ' — stopped at your plan’s subscriber limit'}.
+        </div>
+      )}
+      <form method="POST" action="/api/admin/subscribers/import" enctype="multipart/form-data" class="import-form">
+        <input type="file" name="file" accept=".csv,text/csv" required />
+        <label class="consent"><input type="checkbox" name="consent" value="1" required /> Everyone on this list agreed to receive my emails.</label>
+        <div class="io-actions">
+          <button type="submit">Import CSV</button>
+          <a class="button secondary-btn" href="/api/admin/subscribers/export">Export CSV</a>
+        </div>
       </form>
 
       <h2>All subscribers ({rows.length})</h2>

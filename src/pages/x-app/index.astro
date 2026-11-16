@@ -1,0 +1,29 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { membershipsOf } from '../../lib/auth';
+import { publicationOrigin } from '../../lib/tenant';
+
+const user = Astro.locals.user!;
+const mine = await membershipsOf(user.id);
+if (mine.length === 0) return Astro.redirect('/onboarding');
+---
+
+<AppLayout title="Your publications" current="home">
+	<header class="page-head">
+		<span class="eyebrow">Your desk</span>
+		<h1>Publications</h1>
+		<p class="sub">Signed in as {user.email}.</p>
+	</header>
+	<ul class="pub-list">
+		{mine.map(({ publication, role }) => (
+			<li>
+				<a class="pub-card card lift" href={`/admin?pub=${publication.id}`}>
+					<span class="micro bracket" style="color:var(--accent)">{role}{publication.plan === 'pro' ? ' · pro' : ''}{publication.status === 'suspended' ? ' · suspended' : ''}</span>
+					<strong>{publication.name}</strong>
+					<span class="muted">{new URL(publicationOrigin(Astro.url, publication)).host}</span>
+				</a>
+			</li>
+		))}
+	</ul>
+	<p style="margin-top:2rem;text-align:center"><a class="button" href="/onboarding">Start another publication</a></p>
+</AppLayout>

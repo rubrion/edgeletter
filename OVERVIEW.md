@@ -1,12 +1,5 @@
 # EdgeLetter
 
-EdgeLetter is a high-performance, white-label publishing engine. It ships as a single Cloudflare Worker (Astro SSR + D1 + R2) that runs a public blog, an admin editor, a media uploader, and a newsletter dispatcher — all in one deployment with zero sidecars.
+A self-serve newsletter and blog platform on a single Cloudflare Worker (Astro SSR + D1 + R2 + Queues). Anyone signs up at edgeletter.blog, gets `<handle>.edgeletter.blog`, writes, and sends to subscribers through Resend. Free within limits; Pro adds a custom domain and higher limits.
 
-Each white-label tenant gets **one Worker deployment + one D1 database**. Brand visuals (name, logo, theme color, email sender) are configured live from an admin panel — no redeploy required.
-
-**Email providers:**
-- **Resend** — HTTP API, called directly from the Worker.
-- **Gmail SMTP** — TCP to `smtp.gmail.com:465` via `cloudflare:sockets`. No sidecar container.
-
-Live demo: [edgeletter.rubrion.ai](https://edgeletter.rubrion.ai)  
-Repository: [github.com/rubrion/edgeletter](https://github.com/rubrion/edgeletter)
+Live: [edgeletter.blog](https://edgeletter.blog) · Repository: [github.com/rubrion/edgeletter](https://github.com/rubrion/edgeletter)

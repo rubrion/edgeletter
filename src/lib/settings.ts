@@ -1,13 +1,11 @@
-import { env } from "cloudflare:workers";
 import { and, eq } from "drizzle-orm";
-import { DEFAULT_PUBLICATION_ID, getDbInstance, settings } from "../db";
+import { getDbInstance, settings } from "../db";
 
 export type Settings = {
   clientName: string;
   clientTagline: string;
   clientLogoUrl: string;
   clientFaviconUrl: string;
-  emailFromLocal: string;
   aboutBodyEn: string;
   aboutBodyPt: string;
   // Light theme colors
@@ -33,7 +31,7 @@ export type Settings = {
   widgetMaxWidth: string; // CSS length, e.g. '720px' or ''
   widgetAccentOverride: string; // hex or ''
   widgetAllowedOrigins: string; // comma-separated origins or '*' (informational; CSP allows all parents)
-  widgetHideWatermark: string; // '0' show "Powered by Rubrion" pill (default), '1' hide (white-label)
+  widgetHideWatermark: string; // '1' hides "Made with EdgeLetter" (Pro only)
 };
 
 export const SETTING_KEYS = [
@@ -41,7 +39,6 @@ export const SETTING_KEYS = [
   "clientTagline",
   "clientLogoUrl",
   "clientFaviconUrl",
-  "emailFromLocal",
   "aboutBodyEn",
   "aboutBodyPt",
   "themePrimaryColor",
@@ -92,7 +89,6 @@ const FALLBACKS: Settings = {
   clientTagline: "",
   clientLogoUrl: "",
   clientFaviconUrl: "",
-  emailFromLocal: "noreply",
   aboutBodyEn:
     "{name} is a newsletter and blog. Subscribe to receive new posts in your inbox.",
   aboutBodyPt:
@@ -122,28 +118,6 @@ const FALLBACKS: Settings = {
   widgetHideWatermark: "0",
 };
 
-// Optional seed-fallback env-var name for each setting. Vars may or may not be
-// in wrangler.jsonc; we look them up by string against an unknown-cast env bag.
-// emailFromLocal has no env fallback (the legacy EMAIL_FROM_ADDRESS was a full
-// address, not a local-part).
-const ENV_KEY: Partial<Record<SettingKey, string>> = {
-  clientName: "CLIENT_NAME",
-  clientTagline: "CLIENT_TAGLINE",
-  clientLogoUrl: "CLIENT_LOGO_URL",
-  clientFaviconUrl: "CLIENT_FAVICON_URL",
-  themePrimaryColor: "THEME_PRIMARY_COLOR",
-};
-
-// Env seeds only apply to the default publication (single-tenant deploys);
-// self-serve publications start from FALLBACKS.
-const envValue = (publicationId: string, key: SettingKey): string => {
-  if (publicationId !== DEFAULT_PUBLICATION_ID) return "";
-  const name = ENV_KEY[key];
-  if (!name) return "";
-  const v = (env as unknown as Record<string, string | undefined>)[name];
-  return typeof v === "string" ? v : "";
-};
-
 // Header, footer, head and page each ask for settings on one request; a short
 // per-isolate cache keeps that to one D1 read. Saves invalidate it.
 const CACHE_TTL_MS = 5_000;
@@ -167,9 +141,7 @@ export const loadSettings = async (publicationId: string): Promise<Settings> => 
 
   const out = {} as Settings;
   for (const key of SETTING_KEYS) {
-    out[key] = (dbMap[key]?.trim() ||
-      envValue(publicationId, key).trim() ||
-      FALLBACKS[key]) as string;
+    out[key] = (dbMap[key]?.trim() || FALLBACKS[key]) as string;
   }
   cache.set(publicationId, { value: out, at: Date.now() });
   return out;
@@ -185,7 +157,7 @@ export const saveSettings = async (publicationId: string, patch: Partial<Setting
     if (raw === undefined) continue;
     const value = raw.trim();
     if (value === "") {
-      // Empty ⇒ revert to env fallback by removing the override row.
+      // Empty ⇒ revert to the default by removing the override row.
       await db
         .delete(settings)
         .where(and(eq(settings.publicationId, publicationId), eq(settings.key, key)));

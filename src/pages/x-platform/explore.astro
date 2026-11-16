@@ -1,0 +1,44 @@
+---
+import PlatformLayout from '../../layouts/PlatformLayout.astro';
+import { excerptOf, recentListedPosts } from '../../lib/discovery';
+import { publicationOrigin } from '../../lib/tenant';
+
+const PAGE = 20;
+const page = Math.max(1, Number.parseInt(Astro.url.searchParams.get('page') ?? '1', 10) || 1);
+const rows = await recentListedPosts(PAGE + 1, (page - 1) * PAGE);
+const more = rows.length > PAGE;
+const items = rows.slice(0, PAGE);
+const fmt = (d: Date | null) => (d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+---
+
+<PlatformLayout title="Explore — EdgeLetter" description="Recent posts from publications on EdgeLetter.">
+	<main>
+		<header class="head"><span class="eyebrow rise">The reading room</span><h1 class="rise" style="--i:1">Explore</h1></header>
+		{items.length === 0 ? <p style="text-align:center;font-style:italic;color:var(--muted)">Nothing here yet.</p> : (
+			<ol class="feed">
+				{items.map((p) => (
+					<li class="reveal">
+						<a class="card lift row" href={p.canonicalUrl ?? `${publicationOrigin(Astro.url, p)}/blog/${p.slug}`}>
+							<span class="micro" style="color:var(--accent)">{p.pubName} · {fmt(p.publishedAt)}</span>
+							<strong>{p.title}</strong>
+							<span class="ex">{excerptOf(p.contentMd, 220)}…</span>
+						</a>
+					</li>
+				))}
+			</ol>
+		)}
+		<nav class="pager">
+			{page > 1 && <a class="btn secondary" href={`/explore?page=${page - 1}`}>Newer</a>}
+			{more && <a class="btn secondary" href={`/explore?page=${page + 1}`}>Older</a>}
+		</nav>
+	</main>
+	<style>
+		.head { text-align: center; margin-bottom: 2.5rem; }
+		.head h1 { margin: 0; }
+		.feed { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; }
+		.row { display: flex; flex-direction: column; gap: 0.45rem; padding: 1.5rem 1.75rem; text-decoration: none; color: var(--text); }
+		.row strong { font-family: var(--font-display-stack); font-weight: 500; font-size: 1.6rem; line-height: 1.15; color: var(--ink); }
+		.row .ex { font-style: italic; color: var(--muted); font-size: 0.97rem; }
+		.pager { display: flex; justify-content: center; gap: 0.75rem; margin-top: 2.5rem; }
+	</style>
+</PlatformLayout>

@@ -1,0 +1,83 @@
+---
+import { env } from 'cloudflare:workers';
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import { getDbInstance, reports } from '../db';
+import { getLang } from '../i18n';
+import { EMAIL_RE } from '../lib/auth';
+import { allow, clientIp } from '../lib/ratelimit';
+import { isTurnstileEnabled, verifyTurnstile } from '../lib/turnstile';
+
+// Abuse reports about this publication go to platform staff, not the writer.
+const lang = getLang(Astro.request);
+const publication = Astro.locals.publication;
+const REASONS = ['spam', 'harassment', 'illegal content', 'impersonation', 'phishing or malware', 'other'];
+const turnstile = isTurnstileEnabled(env);
+const siteKey = (env as unknown as { TURNSTILE_SITE_KEY?: string }).TURNSTILE_SITE_KEY ?? '';
+let done = false;
+let error: string | null = null;
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const reason = String(form.get('reason') ?? '');
+	const details = String(form.get('details') ?? '').trim().slice(0, 2000);
+	const email = String(form.get('email') ?? '').trim().slice(0, 200);
+	const url = String(form.get('url') ?? '').trim().slice(0, 500);
+	const ip = clientIp(Astro.request);
+	if (!REASONS.includes(reason)) error = 'Choose a reason.';
+	else if (email && !EMAIL_RE.test(email)) error = 'That email address looks wrong.';
+	else if (!(await allow(`report:${ip}`))) error = 'Too many reports. Try again later.';
+	else {
+		const verdict = turnstile
+			? await verifyTurnstile({ env, token: String(form.get('cf-turnstile-response') ?? ''), remoteIp: ip })
+			: { ok: true as const };
+		if (!verdict.ok) error = 'Please complete the verification.';
+		else {
+			await getDbInstance()
+				.insert(reports)
+				.values({ publicationId: publication.id, reason, details: details || null, reporterEmail: email || null, url: url || null });
+			done = true;
+		}
+	}
+}
+---
+
+<!doctype html>
+<html lang={lang}>
+	<head>
+		<BaseHead title={`Report — ${publication.name}`} description="Report abuse to EdgeLetter staff." />
+		<meta name="robots" content="noindex" />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<header style="text-align:center;margin-bottom:2rem">
+				<span class="eyebrow">To the platform</span>
+				<h1>Report this publication</h1>
+				<p style="font-style:italic;color:var(--muted)">Reports go to EdgeLetter staff, not to the writer.</p>
+			</header>
+			<div class="card" style="padding:2.25rem 2.5rem">
+				{done ? (
+					<p style="text-align:center;margin:0">Thank you. Staff will review your report.</p>
+				) : (
+					<form method="post" class="report-form">
+						{error && <p style="color:#9C2F14">{error}</p>}
+						<label>Reason<select name="reason" required><option value="">Choose…</option>{REASONS.map((r) => <option value={r}>{r}</option>)}</select></label>
+						<label>Page (optional)<input name="url" type="url" placeholder="https://…" /></label>
+						<label>Details<textarea name="details" rows="5" maxlength="2000"></textarea></label>
+						<label>Your email (optional)<input name="email" type="email" placeholder="so staff can follow up" /></label>
+						{turnstile && <div class="cf-turnstile" data-sitekey={siteKey}></div>}
+						<button type="submit" class="btn">Send report</button>
+					</form>
+				)}
+			</div>
+		</main>
+		{turnstile && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+		<style>
+			.report-form { display: grid; gap: 1.1rem; }
+			.report-form label { display: grid; gap: 0.4rem; font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--ink); }
+			.report-form select, .report-form input, .report-form textarea { font: inherit; font-size: 1rem; letter-spacing: 0; text-transform: none; padding: 0.6rem 0.7rem; border: var(--hairline); background: var(--bg-body); color: var(--ink); border-radius: 0; }
+			.report-form button { justify-self: start; }
+		</style>
+	</body>
+</html>

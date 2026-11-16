@@ -1,6 +1,7 @@
 ---
 import { Font } from 'astro:assets';
 import '../../../styles/embed.css';
+import { limitsFor } from '../../../lib/plans';
 import { and, desc, eq } from 'drizzle-orm';
 import { getDbInstance, posts } from '../../../db';
 import { loadSettings, hexToRgbTuple } from '../../../lib/settings';
@@ -34,9 +35,9 @@ const linkBase =
   q.get('linkBase') ||
   (target === '_self' ? `${Astro.url.origin}/embed/blog` : `${Astro.url.origin}/blog`);
 
-// Admin-only flag (D1 setting). Intentionally NOT readable from query string —
-// otherwise tenants could strip the watermark by editing their iframe `src`.
-const showWatermark = settings.widgetHideWatermark !== '1';
+// Hidden only on Pro, and only via the admin setting: never from the query
+// string, or anyone could strip it by editing their iframe `src`.
+const showWatermark = limitsFor(Astro.locals.publication).watermark || settings.widgetHideWatermark !== '1';
 
 const db = getDbInstance();
 const rows = await db
@@ -120,8 +121,8 @@ const dataTheme = themeMode === 'auto' ? null : themeMode;
       )}
       {showWatermark && (
         <div class="ep-wm-row">
-          <a class="ep-wm micro" href="https://rubrion.ai/?utm_source=edgeletter-widget"
-             target="_blank" rel="noopener nofollow">Powered by Rubrion</a>
+          <a class="ep-wm micro" href="https://edgeletter.blog/?utm_source=widget"
+             target="_blank" rel="noopener">Made with EdgeLetter</a>
         </div>
       )}
     </div>

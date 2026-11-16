@@ -1,0 +1,56 @@
+---
+import AdminAppbar from '../components/AdminAppbar.astro';
+import AdminHead from '../components/AdminHead.astro';
+import LogoMark from '../components/LogoMark.astro';
+
+interface Props {
+	title: string;
+	/** Highlighted appbar link. */
+	current?: 'posts' | 'subscribers' | 'stats' | 'widget' | 'settings' | 'members' | 'keys' | 'billing' | 'domain' | 'staff' | 'home';
+	/** Signed-out pages: no appbar, centered card. */
+	bare?: boolean;
+	width?: 'narrow' | 'wide';
+}
+
+const { title, current, bare = false, width = 'wide' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<AdminHead title={`${title} — EdgeLetter`} />
+		<style is:global>
+			.app-main { max-width: 880px; margin: 3rem auto 4rem; padding: 0 1.25rem; }
+			.app-main.narrow { max-width: 460px; }
+			.bare-body { display: grid; place-items: center; padding: 2rem 1rem; box-sizing: border-box; }
+			.bare-brand { display: flex; justify-content: center; margin-bottom: 1.5rem; }
+			.app-card { padding: 2.5rem 2.75rem 2.25rem; }
+			.row { display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap; }
+			.row .field { flex: 1; min-width: 180px; margin-bottom: 0; }
+			.stack > * + * { margin-top: 1rem; }
+			.muted { color: var(--muted); font-style: italic; }
+			.btn-link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 0.18em; }
+			.google-btn { display: flex; width: 100%; box-sizing: border-box; justify-content: center; gap: 0.6rem; align-items: center; padding: 0.8rem 1rem; border: 1px solid rgba(42,35,29,0.25); background: #FBFAF7; color: var(--ink); text-decoration: none; font-size: 0.95rem; }
+			.google-btn:hover { border-color: var(--accent); color: var(--accent); }
+			.divider { display: flex; align-items: center; gap: 0.8rem; margin: 1.4rem 0; color: var(--muted); font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; }
+			.divider::before, .divider::after { content: ''; flex: 1; border-top: var(--hairline); }
+			.pub-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+			.pub-card { display: block; padding: 1.4rem 1.5rem; text-decoration: none; color: var(--text); }
+			.pub-card strong { display: block; font-family: var(--font-display-stack); font-weight: 500; font-size: 1.45rem; line-height: 1.15; color: var(--ink); margin: 0.35rem 0; }
+			.kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.4rem 1.25rem; margin: 0; }
+			.kv dt { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); padding-top: 0.2rem; }
+			.kv dd { margin: 0; }
+			.meter { height: 6px; background: rgba(var(--gray-light), 0.7); margin-top: 0.35rem; }
+			.meter > span { display: block; height: 100%; background: var(--accent); }
+			.secret { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.9rem; padding: 0.8rem 1rem; background: #2A231D; color: #EDE6DA; word-break: break-all; }
+			.inline-form { display: inline; margin: 0; }
+		</style>
+	</head>
+	<body class:list={[bare && 'bare-body']} style="--theme: #B44A27">
+		{!bare && <AdminAppbar current={current} />}
+		<main class:list={['app-main', width === 'narrow' && 'narrow']}>
+			{bare && <div class="bare-brand"><a href="/"><LogoMark size={44} /></a></div>}
+			<slot />
+		</main>
+	</body>
+</html>

@@ -1,0 +1,27 @@
+---
+import PlatformLayout from '../../layouts/PlatformLayout.astro';
+import { listedPublications } from '../../lib/discovery';
+import { publicationOrigin } from '../../lib/tenant';
+
+const pubs = await listedPublications();
+---
+
+<PlatformLayout title="Directory — EdgeLetter" description="Every publication listed on EdgeLetter.">
+	<main>
+		<header class="head"><span class="eyebrow rise">Who writes here</span><h1 class="rise" style="--i:1">Directory</h1></header>
+		{pubs.length === 0 ? <p style="text-align:center;font-style:italic;color:var(--muted)">No publications listed yet.</p> : (
+			<ul class="dir">
+				{pubs.map((p) => (
+					<li class="reveal"><a class="card lift" href={publicationOrigin(Astro.url, p)}><strong>{p.name}</strong><span class="micro">{new URL(publicationOrigin(Astro.url, p)).host}</span></a></li>
+				))}
+			</ul>
+		)}
+	</main>
+	<style>
+		.head { text-align: center; margin-bottom: 2.5rem; }
+		.head h1 { margin: 0; }
+		.dir { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+		.dir a { display: flex; flex-direction: column; gap: 0.4rem; padding: 1.4rem 1.5rem; text-decoration: none; color: var(--muted); }
+		.dir strong { font-family: var(--font-display-stack); font-weight: 500; font-size: 1.4rem; color: var(--ink); }
+	</style>
+</PlatformLayout>

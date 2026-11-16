@@ -1,111 +1,137 @@
 import { env } from 'cloudflare:workers';
 import { eq } from 'drizzle-orm';
-import { DEFAULT_PUBLICATION_ID, getDbInstance, publications, type Publication } from '../db';
+import { getDbInstance, publicationAliases, publications, type Publication } from '../db';
 
 /**
- * Host → publication resolution.
+ * Host → what this request is for.
  *
- * 1. Exact custom domain match (publications.custom_domain).
- * 2. <handle>.<PLATFORM_DOMAIN>, when PLATFORM_DOMAIN is configured.
- * 3. Otherwise the default publication — this is what single-publication
- *    (white-label) deployments and local dev resolve to.
+ *   <PLATFORM_DOMAIN>, www.<PLATFORM_DOMAIN>  → platform (landing, discovery)
+ *   app.<PLATFORM_DOMAIN>                     → app (sign-in, dashboard, staff)
+ *   <handle>.<PLATFORM_DOMAIN>, custom domain → a publication
+ *   publication_aliases host                  → old address of a publication (redirects)
+ *   anything else                             → unknown (404)
  *
- * Results are cached per isolate for a short TTL; D1 is only hit on a miss.
+ * Lookups are cached per isolate for a short TTL. Database errors are never
+ * cached and surface as TenantLookupError so the request fails closed.
  */
 
-export type PublicationContext = Pick<Publication, 'id' | 'handle' | 'name' | 'status' | 'customDomain'>;
+export type PublicationContext = Pick<
+  Publication,
+  'id' | 'handle' | 'name' | 'status' | 'customDomain' | 'plan' | 'listed' | 'createdAt' | 'legacyMediaPrefix'
+>;
 
-const TTL_MS = 60_000;
-const cache = new Map<string, { value: PublicationContext | null; at: number }>();
+export type HostTarget =
+  | { kind: 'platform' }
+  | { kind: 'app' }
+  | { kind: 'publication'; publication: PublicationContext }
+  | { kind: 'alias'; publication: PublicationContext }
+  | { kind: 'unknown' };
 
-const platformDomain = (): string =>
+export class TenantLookupError extends Error {}
+
+export const platformDomain = (): string =>
   ((env as unknown as { PLATFORM_DOMAIN?: string }).PLATFORM_DOMAIN ?? '').trim().toLowerCase();
 
-const FALLBACK: PublicationContext = {
-  id: DEFAULT_PUBLICATION_ID,
-  handle: DEFAULT_PUBLICATION_ID,
-  name: 'EdgeLetter',
-  status: 'active',
-  customDomain: null,
-};
-
-const columns = {
+export const publicationColumns = {
   id: publications.id,
   handle: publications.handle,
   name: publications.name,
   status: publications.status,
   customDomain: publications.customDomain,
+  plan: publications.plan,
+  listed: publications.listed,
+  createdAt: publications.createdAt,
+  legacyMediaPrefix: publications.legacyMediaPrefix,
 };
 
-/** Thrown when the publication can't be determined (e.g. D1 unavailable). */
-export class TenantLookupError extends Error {}
+const TTL_MS = 60_000;
+const NEGATIVE_TTL_MS = 10_000;
+const MAX_ENTRIES = 1000;
+const cache = new Map<string, { value: HostTarget; at: number }>();
 
-const lookup = async (host: string): Promise<PublicationContext | null> => {
-  const db = getDbInstance();
+const byField = async (field: 'customDomain' | 'handle' | 'id', value: string) => {
+  const [row] = await getDbInstance()
+    .select(publicationColumns)
+    .from(publications)
+    .where(eq(publications[field], value))
+    .limit(1);
+  return row ?? null;
+};
+
+export const publicationById = (id: string) => byField('id', id);
+export const publicationByHandle = (handle: string) => byField('handle', handle);
+
+const lookup = async (host: string): Promise<HostTarget> => {
+  const root = platformDomain();
   try {
-    const [byDomain] = await db.select(columns).from(publications).where(eq(publications.customDomain, host)).limit(1);
-    if (byDomain) return byDomain;
+    if (root && (host === root || host === `www.${root}`)) return { kind: 'platform' };
+    if (root && host === `app.${root}`) return { kind: 'app' };
 
-    const root = platformDomain();
+    const custom = await byField('customDomain', host);
+    if (custom) return { kind: 'publication', publication: custom };
+
+    const [alias] = await getDbInstance()
+      .select({ publicationId: publicationAliases.publicationId })
+      .from(publicationAliases)
+      .where(eq(publicationAliases.host, host))
+      .limit(1);
+    if (alias) {
+      const pub = await byField('id', alias.publicationId);
+      if (pub) return { kind: 'alias', publication: pub };
+    }
+
     if (root && host.endsWith(`.${root}`)) {
       const handle = host.slice(0, -(root.length + 1));
       if (handle && !handle.includes('.')) {
-        const [byHandle] = await db.select(columns).from(publications).where(eq(publications.handle, handle)).limit(1);
-        return byHandle ?? null;
+        const pub = await byField('handle', handle);
+        if (pub) return { kind: 'publication', publication: pub };
       }
     }
-
-    const [def] = await db.select(columns).from(publications).where(eq(publications.id, DEFAULT_PUBLICATION_ID)).limit(1);
-    return def ?? null;
+    return { kind: 'unknown' };
   } catch (err) {
-    // Only a pre-migration database (no publications table yet) may fall back
-    // to the default publication. Anything else fails closed: serving or
-    // writing to the wrong tenant is worse than a 503.
-    if (/no such table/i.test(String(err))) return FALLBACK;
     throw new TenantLookupError(String(err));
   }
 };
 
-const MAX_ENTRIES = 1000;
-const NEGATIVE_TTL_MS = 10_000;
-
-export const resolvePublication = async (hostHeader: string | null): Promise<PublicationContext | null> => {
+export const resolveHost = async (hostHeader: string | null): Promise<HostTarget> => {
   const host = (hostHeader ?? '').toLowerCase().replace(/:\d+$/, '');
   const hit = cache.get(host);
-  const ttl = hit?.value ? TTL_MS : NEGATIVE_TTL_MS;
+  const ttl = hit && hit.value.kind !== 'unknown' ? TTL_MS : NEGATIVE_TTL_MS;
   if (hit && Date.now() - hit.at < ttl) return hit.value;
-  const value = await lookup(host); // throws TenantLookupError: never cached
-  if (value === FALLBACK) return value; // pre-migration fallback: don't cache
+  const value = await lookup(host);
   if (cache.size >= MAX_ENTRIES) cache.clear();
   cache.set(host, { value, at: Date.now() });
   return value;
 };
 
-/** Drop cached host mappings (after a publication's handle/domain changes). */
+/** Drop cached host mappings (after a handle, domain, plan or status change). */
 export const invalidatePublicationCache = (): void => cache.clear();
 
 /** The publication of the current request; set by middleware. */
 export const pubId = (locals: App.Locals): string => locals.publication.id;
 
-/**
- * Public hostname of a publication, used for links in emails and feeds:
- * custom domain → <handle>.<PLATFORM_DOMAIN> → CLIENT_DOMAIN (single-tenant).
- */
-export const publicationHost = (publication: Pick<PublicationContext, 'id' | 'handle' | 'customDomain'>): string => {
-  if (publication.customDomain) return publication.customDomain;
-  const root = platformDomain();
-  if (root && publication.id !== DEFAULT_PUBLICATION_ID) return `${publication.handle}.${root}`;
-  return ((env as unknown as { CLIENT_DOMAIN?: string }).CLIENT_DOMAIN ?? '').trim();
-};
+/** Public hostname of a publication: custom domain, else <handle>.<PLATFORM_DOMAIN>. */
+export const publicationHost = (publication: Pick<PublicationContext, 'handle' | 'customDomain'>): string =>
+  publication.customDomain || `${publication.handle}.${platformDomain()}`;
 
 /**
- * R2 key prefix for a publication's uploads. The default publication keeps the
- * historical `edgeletter/<CLIENT_SLUG>/` layout so existing media URLs still work.
+ * Origin for a platform subdomain ('' = root), keeping the scheme and port of
+ * the current request so links also work in local dev (*.localhost:4321).
  */
-export const mediaPrefix = (publicationId: string): string => {
-  if (publicationId === DEFAULT_PUBLICATION_ID) {
-    const slug = ((env as unknown as { CLIENT_SLUG?: string }).CLIENT_SLUG ?? 'default').trim() || 'default';
-    return `edgeletter/${slug}`;
-  }
-  return `edgeletter/pub/${publicationId}`;
+export const platformOrigin = (current: URL, sub: string): string => {
+  const host = sub ? `${sub}.${platformDomain()}` : platformDomain();
+  return `${current.protocol}//${host}${current.port ? `:${current.port}` : ''}`;
 };
+
+/** Origin of a publication's public site, same scheme/port rules as platformOrigin. */
+export const publicationOrigin = (current: URL, publication: Pick<PublicationContext, 'handle' | 'customDomain'>): string =>
+  publication.customDomain
+    ? `https://${publication.customDomain}`
+    : platformOrigin(current, publication.handle);
+
+/** R2 key prefix for a publication's uploads. */
+export const mediaPrefix = (publicationId: string): string => `edgeletter/pub/${publicationId}`;
+
+/** Every prefix that may hold this publication's media (current + pre-platform). */
+export const mediaPrefixes = (publication: Pick<PublicationContext, 'id' | 'legacyMediaPrefix'>): string[] =>
+  [mediaPrefix(publication.id), publication.legacyMediaPrefix].filter((p): p is string => !!p);

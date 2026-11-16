@@ -8,12 +8,16 @@ type WrapArgs = {
   postUrl: string;
   postHtml: string;
   unsubscribeUrl: string;
+  /** Abuse report page of the publication. */
+  reportUrl?: string;
+  /** Free plan: small 'Made with EdgeLetter' line in the footer. */
+  showWatermark?: boolean;
   lang?: 'en' | 'pt';
 };
 
 const WORDS = {
-  en: { read: 'Read on the web →', why: 'You received this because you subscribed at', unsubscribe: 'Unsubscribe' },
-  pt: { read: 'Ler na web →', why: 'Você recebeu este e-mail porque assinou em', unsubscribe: 'Cancelar inscrição' },
+  en: { read: 'Read on the web →', why: 'You received this because you subscribed at', unsubscribe: 'Unsubscribe', report: 'Report abuse', made: 'Made with EdgeLetter' },
+  pt: { read: 'Ler na web →', why: 'Você recebeu este e-mail porque assinou em', unsubscribe: 'Cancelar inscrição', report: 'Denunciar abuso', made: 'Feito com EdgeLetter' },
 };
 
 export type WrappedEmail = { html: string; text: string };
@@ -26,6 +30,8 @@ export const wrapPostInEmail = ({
   postUrl,
   postHtml,
   unsubscribeUrl,
+  reportUrl,
+  showWatermark = false,
   lang = 'en',
 }: WrapArgs): WrappedEmail => {
   const w = WORDS[lang];
@@ -71,6 +77,8 @@ ${E.fontsLink}
           ${w.why} ${escapeHtml(clientDomain)}
           &nbsp;&middot;&nbsp;
           <a href="${unsubscribeUrl}" style="color:${E.muted};text-decoration:underline;">${w.unsubscribe}</a>
+          ${reportUrl ? `&nbsp;&middot;&nbsp;<a href="${reportUrl}" style="color:${E.muted};text-decoration:underline;">${w.report}</a>` : ''}
+          ${showWatermark ? `<br><a href="https://edgeletter.blog/?utm_source=email" style="color:${E.muted};text-decoration:none;">${w.made}</a>` : ''}
         </p>
       </td></tr>
     </table>

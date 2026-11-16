@@ -1,8 +1,8 @@
 ---
-import { env } from 'cloudflare:workers';
 import AdminEditor from '../../components/AdminEditor.tsx';
 import AdminAppbar from '../../components/AdminAppbar.astro';
 import AdminHead from '../../components/AdminHead.astro';
+import { limitsFor } from '../../lib/plans';
 import { getDbInstance, aiUsage, campaigns, posts } from '../../db';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { loadSettings } from '../../lib/settings';
@@ -46,8 +46,7 @@ const settings = await loadSettings(Astro.locals.publication.id);
 const themeColor = settings.themePrimaryColor;
 const clientName = settings.clientName;
 
-const aiLimitRaw = (env as unknown as { AI_REVIEW_DAILY_TOKEN_LIMIT?: string }).AI_REVIEW_DAILY_TOKEN_LIMIT;
-const aiLimit = Number.parseInt(aiLimitRaw ?? '', 10);
+const aiLimit = limitsFor(Astro.locals.publication).aiTokensPerDay;
 let aiUsedToday = 0;
 if (Number.isFinite(aiLimit) && aiLimit > 0) {
   const today = new Date().toISOString().slice(0, 10);

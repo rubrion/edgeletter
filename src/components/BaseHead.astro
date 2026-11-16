@@ -41,7 +41,7 @@ html[data-theme="dark"] {
 `;
 
 const { title, description, ogType = 'website', publishedAt, canonical } = Astro.props;
-const canonicalURL = canonical ? new URL(canonical) : new URL(Astro.url.pathname, Astro.site);
+const canonicalURL = canonical ? new URL(canonical) : new URL(Astro.url.pathname, Astro.url.origin);
 
 const articleJsonLd =
 	ogType === 'article'
@@ -89,8 +89,8 @@ const articleJsonLd =
 		<link rel="manifest" href="/site.webmanifest" />
 	</>
 )}
-<link rel="sitemap" href="/sitemap-index.xml" />
-<link rel="alternate" type="application/rss+xml" title={clientName} href={new URL('rss.xml', Astro.site)} />
+<link rel="sitemap" href="/sitemap.xml" />
+<link rel="alternate" type="application/rss+xml" title={clientName} href={new URL('/rss.xml', Astro.url.origin)} />
 <meta name="generator" content={Astro.generator} />
 
 <Font cssVariable="--font-display" preload />

@@ -23,7 +23,7 @@ export async function GET(context) {
 	return rss({
 		title: clientName,
 		description,
-		site: context.site,
+		site: context.url.origin,
 		items: rows.map((p) => ({
 			title: p.title,
 			pubDate: p.publishedAt ?? new Date(),

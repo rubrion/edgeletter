@@ -1,9 +1,8 @@
 import { EMAIL, deepen, microStyle } from './email-style';
-import { sendBatchGmail } from './smtp';
+import { platformFrom, sendMail } from './mailer';
 import type { Settings } from './settings';
 
 type SendConfirmArgs = {
-  env: unknown;
   settings: Settings;
   /** Public hostname of the publication. */
   host: string;
@@ -89,23 +88,12 @@ const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export const sendConfirmationEmail = async ({
-  env,
   settings,
   host,
   to,
   confirmUrl,
   lang = 'en',
 }: SendConfirmArgs): Promise<void> => {
-  const e = env as {
-    EMAIL_PROVIDER?: string;
-    CLIENT_DOMAIN?: string;
-    EMAIL_FROM_DOMAIN?: string;
-    RESEND_API_KEY?: string;
-    GMAIL_USER?: string;
-    GMAIL_APP_PASSWORD?: string;
-  };
-  const provider = e.EMAIL_PROVIDER === 'GMAIL' ? 'GMAIL' : 'RESEND';
-  const subject = WORDS[lang].subject(settings.clientName);
   const { html, text } = buildBody({
     clientName: settings.clientName,
     confirmUrl,
@@ -113,38 +101,11 @@ export const sendConfirmationEmail = async ({
     clientDomain: host,
     lang,
   });
-
-  if (provider === 'RESEND') {
-    if (!e.RESEND_API_KEY) throw new Error('RESEND_API_KEY not set');
-    const fromDomain = e.EMAIL_FROM_DOMAIN || host;
-    const local = settings.emailFromLocal.trim() || 'noreply';
-    const fromAddress = `${local}@${fromDomain}`;
-    const from = `${settings.clientName} <${fromAddress}>`;
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${e.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ from, to, subject, html, text }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`resend ${res.status}: ${body}`);
-    }
-    return;
-  }
-
-  if (!e.GMAIL_USER || !e.GMAIL_APP_PASSWORD) {
-    throw new Error('GMAIL_USER or GMAIL_APP_PASSWORD not set');
-  }
-  await sendBatchGmail({
-    user: e.GMAIL_USER,
-    pass: e.GMAIL_APP_PASSWORD,
-    fromAddress: e.GMAIL_USER,
-    fromName: settings.clientName,
-    recipients: [to],
-    subject,
+  await sendMail({
+    from: platformFrom(settings.clientName, 'confirm'),
+    to,
+    subject: WORDS[lang].subject(settings.clientName),
     html,
+    text,
   });
 };

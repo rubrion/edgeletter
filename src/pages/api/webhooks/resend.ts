@@ -1,9 +1,11 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { emailSuppressions, getDbInstance } from '../../../db';
+import { eq, isNull, and } from 'drizzle-orm';
+import { campaignDeliveries, emailSuppressions, getDbInstance } from '../../../db';
 
 /**
- * Resend delivery events → platform-wide suppression list.
+ * Resend delivery events → platform-wide suppression list, plus open/click
+ * timestamps on campaign deliveries.
  *
  * Hard bounces and spam complaints must never be emailed again: on a shared
  * sending domain one bad list hurts every publication's deliverability.
@@ -44,6 +46,7 @@ const verifySvix = async (secret: string, id: string, ts: string, body: string, 
 type ResendEvent = {
   type?: string;
   data?: {
+    email_id?: string;
     to?: string | string[];
     email?: string;
     bounce?: { type?: string; subType?: string; message?: string };
@@ -74,6 +77,17 @@ export const POST: APIRoute = async ({ request }) => {
     event = JSON.parse(body) as ResendEvent;
   } catch {
     return new Response('invalid json', { status: 400 });
+  }
+
+  // Engagement: first open / first click per delivery, for the stats page.
+  if ((event.type === 'email.opened' || event.type === 'email.clicked') && event.data?.email_id) {
+    const column = event.type === 'email.opened' ? campaignDeliveries.openedAt : campaignDeliveries.clickedAt;
+    const field = event.type === 'email.opened' ? 'openedAt' : 'clickedAt';
+    await getDbInstance()
+      .update(campaignDeliveries)
+      .set({ [field]: new Date() })
+      .where(and(eq(campaignDeliveries.providerId, event.data.email_id), isNull(column)));
+    return new Response('ok', { status: 200 });
   }
 
   let reason: 'bounce' | 'complaint' | null = null;

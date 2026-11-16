@@ -3,10 +3,12 @@ import { getLang, useTranslations } from '../i18n';
 import { loadSettings } from '../lib/settings';
 import SubscribeForm from './SubscribeForm.astro';
 import Reveal from './Reveal.astro';
+import { limitsFor } from '../lib/plans';
 
 const settings = await loadSettings(Astro.locals.publication.id);
 const clientName = settings.clientName;
 const today = new Date();
+const showWatermark = limitsFor(Astro.locals.publication).watermark || settings.widgetHideWatermark !== '1';
 
 const lang = getLang(Astro.request);
 const t = useTranslations(lang);
@@ -21,6 +23,9 @@ const t = useTranslations(lang);
 		<span class="micro">&copy; {today.getFullYear()} {clientName}</span>
 		<span class="sep" aria-hidden="true">✦</span>
 		<span class="micro">{t('footer.rights')}</span>
+		<span class="sep" aria-hidden="true">✦</span>
+		<a class="micro foot-link" href="/report">{t('footer.report')}</a>
+		{showWatermark && (<><span class="sep" aria-hidden="true">✦</span><a class="micro foot-link" href="https://edgeletter.blog/?utm_source=footer">{t('footer.made')}</a></>)}
 	</footer>
 </section>
 <Reveal />
@@ -66,4 +71,6 @@ const t = useTranslations(lang);
 		text-align: center;
 	}
 	.sep { font-size: 0.7rem; }
+	.foot-link { color: inherit; text-decoration: none; }
+	.foot-link:hover { text-decoration: underline; color: var(--on-accent); }
 </style>

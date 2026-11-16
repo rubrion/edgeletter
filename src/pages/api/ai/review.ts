@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { limitsFor } from '../../../lib/plans';
 import { and, eq, sql } from 'drizzle-orm';
 import { env } from 'cloudflare:workers';
 import { aiUsage, getDbInstance } from '../../../db';
@@ -40,11 +41,7 @@ const projectOutputTokens = (inputTokens: number): number =>
 
 export const POST: APIRoute = async ({ request, locals }) => {
   const publicationId = locals.publication.id;
-  const limitRaw = (env as unknown as { AI_REVIEW_DAILY_TOKEN_LIMIT?: string }).AI_REVIEW_DAILY_TOKEN_LIMIT;
-  const limit = Number.parseInt(limitRaw ?? '', 10);
-  if (!Number.isFinite(limit) || limit <= 0) {
-    return json({ error: 'AI_REVIEW_DAILY_TOKEN_LIMIT is not configured' }, 500);
-  }
+  const limit = limitsFor(locals.publication).aiTokensPerDay;
 
   let body: unknown;
   try {

@@ -1,0 +1,83 @@
+---
+import { env } from 'cloudflare:workers';
+import AppLayout from '../../layouts/AppLayout.astro';
+import { EMAIL_RE, issueLoginToken, normalizeEmail } from '../../lib/auth';
+import { sendLoginLink } from '../../lib/auth-email';
+import { googleEnabled } from '../../lib/google';
+import { allow, clientIp } from '../../lib/ratelimit';
+import { isTurnstileEnabled, verifyTurnstile } from '../../lib/turnstile';
+
+// Only same-site relative paths may be used as a post-login destination.
+const safeNext = (v: string | null): string => (v && /^\/(?!\/)[^\s]*$/.test(v) ? v : '/');
+const next = safeNext(Astro.url.searchParams.get('next'));
+
+if (Astro.locals.user) return Astro.redirect(next);
+
+let sent = false;
+let error: string | null = Astro.url.searchParams.get('error');
+const turnstile = isTurnstileEnabled(env);
+const siteKey = (env as unknown as { TURNSTILE_SITE_KEY?: string }).TURNSTILE_SITE_KEY ?? '';
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const email = normalizeEmail(String(form.get('email') ?? ''));
+	const ip = clientIp(Astro.request);
+	if (!EMAIL_RE.test(email)) {
+		error = 'Enter a valid email address.';
+	} else if (!(await allow(`signin:ip:${ip}`)) || !(await allow(`signin:email:${email}`))) {
+		error = 'Too many attempts. Wait a minute and try again.';
+	} else {
+		const verdict = turnstile
+			? await verifyTurnstile({ env, token: String(form.get('cf-turnstile-response') ?? ''), remoteIp: ip })
+			: { ok: true as const };
+		if (!verdict.ok) {
+			error = 'Please complete the verification.';
+		} else {
+			const token = await issueLoginToken({ email });
+			const link = new URL('/auth/verify', Astro.url.origin);
+			link.searchParams.set('token', token);
+			if (next !== '/') link.searchParams.set('next', next);
+			try {
+				await sendLoginLink(email, link.toString());
+				sent = true;
+			} catch (err) {
+				console.error('sign-in email failed', err);
+				error = 'We could not send the email. Try again shortly.';
+			}
+		}
+	}
+}
+---
+
+<AppLayout title="Sign in" bare width="narrow">
+	<div class="card app-card">
+		<header class="page-head">
+			<span class="eyebrow">Welcome to EdgeLetter</span>
+			<h1>{sent ? 'Check your inbox' : 'Sign in'}</h1>
+			<p class="sub">{sent ? 'We sent you a sign-in link. It works once and expires in 15 minutes.' : 'Start a publication or pick up where you left off. No password needed.'}</p>
+		</header>
+		{error && <div class="alert err">{error}</div>}
+		{!sent && (
+			<>
+				{googleEnabled() && (
+					<>
+						<a class="google-btn" href={`/auth/google?next=${encodeURIComponent(next)}`}>
+							<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.8-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.9l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
+							Continue with Google
+						</a>
+						<div class="divider">or</div>
+					</>
+				)}
+				<form method="post">
+					<div class="field">
+						<label for="email">Email</label>
+						<input id="email" name="email" type="email" required autocomplete="email" placeholder="you@example.com" />
+					</div>
+					{turnstile && <div class="cf-turnstile" data-sitekey={siteKey}></div>}
+					<button type="submit" style="width:100%;margin-top:0.5rem">Email me a sign-in link</button>
+				</form>
+				{turnstile && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+			</>
+		)}
+	</div>
+</AppLayout>

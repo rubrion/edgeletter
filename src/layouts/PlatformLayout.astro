@@ -1,0 +1,68 @@
+---
+import '../styles/global.css';
+import { Font } from 'astro:assets';
+import LogoMark from '../components/LogoMark.astro';
+import Reveal from '../components/Reveal.astro';
+import { platformOrigin } from '../lib/tenant';
+
+interface Props {
+	title: string;
+	description: string;
+}
+const { title, description } = Astro.props;
+const app = platformOrigin(Astro.url, 'app');
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+	<head>
+		<meta charset="utf-8" />
+		<script is:inline>
+			if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+				document.documentElement.classList.add('reveal-ready');
+				setTimeout(function () { if (!window.__edgeReveal) document.documentElement.classList.remove('reveal-ready'); }, 2500);
+			}
+		</script>
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<meta name="theme-color" content="#B44A27" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="canonical" href={new URL(Astro.url.pathname, Astro.url.origin)} />
+		<Font cssVariable="--font-display" preload />
+		<Font cssVariable="--font-body" preload />
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:type" content="website" />
+	</head>
+	<body>
+		<header class="pf-header">
+			<nav>
+				<a href="/" class="pf-brand"><LogoMark size={30} /><span>EdgeLetter</span></a>
+				<div class="pf-links">
+					<a class="micro" href="/explore">Explore</a>
+					<a class="micro" href="/directory">Directory</a>
+					<a class="micro bracket" href={`${app}/signin`}>Sign in</a>
+				</div>
+			</nav>
+		</header>
+		<slot />
+		<footer class="pf-footer pocket">
+			<span class="micro deboss">EdgeLetter ✦ Newsletters, written by hand and sent at the edge</span>
+		</footer>
+		<Reveal />
+		<style>
+			.pf-header { background: var(--card); border-bottom: var(--hairline); box-shadow: var(--shadow-paper); padding: 0 1.5em; position: relative; z-index: 2; }
+			.pf-header nav { max-width: 1080px; margin: 0 auto; min-height: 4.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+			.pf-brand { display: inline-flex; align-items: center; gap: 0.7rem; font-family: var(--font-display-stack); font-weight: 500; font-size: 1.6rem; color: var(--ink); text-decoration: none; }
+			.pf-brand :global(svg) { box-shadow: var(--shadow-paper); }
+			.pf-links { display: flex; gap: 1.75rem; align-items: center; }
+			.pf-links a { color: var(--ink); text-decoration: none; }
+			.pf-links a:hover { color: var(--accent); }
+			.pf-footer { margin-top: 5rem; padding: 4.5rem 1rem 3rem; text-align: center; }
+			@media (max-width: 560px) { .pf-links { gap: 1rem; } .pf-brand span { display: none; } }
+		</style>
+	</body>
+</html>

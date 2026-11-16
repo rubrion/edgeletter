@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { sql } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../../../db';
+import { limitsFor, subscriberCount } from '../../../../lib/plans';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -29,6 +30,12 @@ export const POST: APIRoute = async ({ request, redirect, locals }) => {
     return redirect('/admin/subscribers?error=invalid+email', 303);
   }
 
+  const cap = limitsFor(locals.publication).subscribers;
+  if ((await subscriberCount(locals.publication.id)) >= cap) {
+    const msg = `Subscriber limit reached (${cap.toLocaleString()}).`;
+    if (isJson) return Response.json({ error: msg }, { status: 403 });
+    return redirect(`/admin/subscribers?error=${encodeURIComponent(msg)}`, 303);
+  }
   const db = getDbInstance();
   await db
     .insert(subscribers)

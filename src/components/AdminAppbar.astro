@@ -1,43 +1,56 @@
 ---
+import { membershipsOf } from '../lib/auth';
 import { loadSettings } from '../lib/settings';
+import { publicationOrigin } from '../lib/tenant';
 import LogoMark from './LogoMark.astro';
 
+type Key = 'posts' | 'subscribers' | 'stats' | 'widget' | 'settings' | 'members' | 'keys' | 'billing' | 'domain' | 'staff' | 'home';
+
 interface Props {
-  current?: 'posts' | 'subscribers' | 'widget' | 'settings';
+  current?: Key;
 }
 
 const { current } = Astro.props;
+const { user, role, publication } = Astro.locals;
 
-const settings = await loadSettings(Astro.locals.publication.id);
-const themeColor = settings.themePrimaryColor;
-const clientName = settings.clientName;
+const settings = publication ? await loadSettings(publication.id) : null;
+const themeColor = settings?.themePrimaryColor ?? '#B44A27';
+const mine = user ? await membershipsOf(user.id) : [];
+const owner = role === 'owner';
 
-const links: { key: NonNullable<Props['current']>; href: string; label: string }[] = [
-  { key: 'posts', href: '/admin', label: 'Posts' },
-  { key: 'subscribers', href: '/admin/subscribers', label: 'Subscribers' },
-  { key: 'widget', href: '/admin/widget', label: 'Widget' },
-  { key: 'settings', href: '/admin/settings', label: 'Settings' },
+const links: { key: Key; href: string; label: string; show: boolean }[] = [
+  { key: 'posts', href: '/admin', label: 'Posts', show: !!publication },
+  { key: 'subscribers', href: '/admin/subscribers', label: 'Subscribers', show: !!publication },
+  { key: 'stats', href: '/admin/stats', label: 'Stats', show: !!publication },
+  { key: 'settings', href: '/admin/settings', label: 'Settings', show: !!publication && owner },
+  { key: 'widget', href: '/admin/widget', label: 'Widget', show: !!publication && owner },
+  { key: 'members', href: '/members', label: 'Team', show: !!publication && owner },
+  { key: 'keys', href: '/keys', label: 'API keys', show: !!publication && owner },
+  { key: 'domain', href: '/domain', label: 'Domain', show: !!publication && owner },
+  { key: 'billing', href: '/billing', label: 'Plan', show: !!publication && owner },
+  { key: 'staff', href: '/staff', label: 'Staff', show: !!user?.isStaff },
 ];
 ---
 
+
 <nav class="admin-appbar" style={`--theme: ${themeColor}`}>
-  <a href="/admin" class="brand"><LogoMark size={26} class="mark" />{clientName}<span class="brand-sub">Studio</span></a>
+  <a href="/" class="brand"><LogoMark size={26} class="mark" />{publication?.name ?? 'EdgeLetter'}<span class="brand-sub">Studio</span></a>
+  {mine.length > 1 && (
+    <form method="get" action="/admin" class="switcher">
+      <label class="sr-only" for="pub-switch">Publication</label>
+      <select id="pub-switch" name="pub" onchange="this.form.submit()">
+        {mine.map((m) => <option value={m.publication.id} selected={m.publication.id === publication?.id}>{m.publication.name}</option>)}
+      </select>
+    </form>
+  )}
   <div class="links">
-    {links.map((l) => (
+    {links.filter((l) => l.show).map((l) => (
       <a href={l.href} class:list={['nav-link', current === l.key && 'active']}>{l.label}</a>
     ))}
   </div>
-  <a href="/api/admin/logout" id="admin-appbar-logout" class="signout">Sign out</a>
+  {publication && <a href={publicationOrigin(Astro.url, publication)} class="nav-link view" target="_blank" rel="noopener">View site ↗</a>}
+  <form method="post" action="/signout" class="signout-form"><button type="submit" class="signout">Sign out</button></form>
 </nav>
-
-<script>
-  const logout = document.getElementById('admin-appbar-logout');
-  logout?.addEventListener('click', async (e) => {
-    e.preventDefault();
-    await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
-    window.location.href = '/admin/login';
-  });
-</script>
 
 <style>
   .admin-appbar {
@@ -109,6 +122,11 @@ const links: { key: NonNullable<Props['current']>; href: string; label: string }
   .signout::before { content: '[\00a0'; }
   .signout::after { content: '\00a0]'; }
   .signout:hover { color: var(--accent); }
+  .signout-form { margin: 0; }
+  button.signout { background: none; border: none; padding: 0.4rem 0; cursor: pointer; font-family: inherit; }
+  .switcher { margin: 0; }
+  .switcher select { width: auto; padding: 0.35rem 2rem 0.35rem 0.6rem; font-size: 0.85rem; }
+  .view { white-space: nowrap; }
 
   @media (max-width: 720px) {
     .admin-appbar { flex-wrap: wrap; gap: 0.5rem 1.25rem; padding: 0.75rem 1rem; }

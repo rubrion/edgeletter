@@ -4,11 +4,14 @@ import {
   campaigns,
   emailSuppressions,
   getDbInstance,
+  memberships,
   posts,
   publications,
   subscribers,
+  users,
   type Post,
 } from '../db';
+import { limitsFor } from './plans';
 import { providerFor, sendBatch, type Recipient } from './dispatch';
 import { loadSettings } from './settings';
 import { publicationHost } from './tenant';
@@ -191,6 +194,22 @@ const setDeliveries = async (
   }
 };
 
+/** Remember provider email ids so open/click webhooks can find the delivery. */
+const recordProviderIds = async (campaignId: string, ids: Record<string, string>): Promise<void> => {
+  const entries = Object.entries(ids);
+  if (entries.length === 0) return;
+  const db = getDbInstance();
+  // One small statement per recipient keeps well under D1's parameter cap;
+  // D1 batches them into a single round trip.
+  const statements = entries.map(([subscriberId, providerId]) =>
+    db
+      .update(campaignDeliveries)
+      .set({ providerId })
+      .where(and(eq(campaignDeliveries.campaignId, campaignId), eq(campaignDeliveries.subscriberId, subscriberId))),
+  );
+  await db.batch(statements as unknown as Parameters<typeof db.batch>[0]);
+};
+
 /** Recompute counters and status from the ledger in one atomic statement. */
 export const settle = async (campaignId: string): Promise<void> => {
   const d = (statuses: string) =>
@@ -238,7 +257,14 @@ export const processEmailJob = async (env: Env, job: EmailJob): Promise<string[]
     .where(and(eq(posts.id, job.postId), eq(posts.publicationId, job.publicationId)))
     .limit(1);
   const [publication] = await db
-    .select({ id: publications.id, handle: publications.handle, customDomain: publications.customDomain, status: publications.status })
+    .select({
+      id: publications.id,
+      handle: publications.handle,
+      customDomain: publications.customDomain,
+      status: publications.status,
+      plan: publications.plan,
+      createdAt: publications.createdAt,
+    })
     .from(publications)
     .where(eq(publications.id, job.publicationId))
     .limit(1);
@@ -269,10 +295,25 @@ export const processEmailJob = async (env: Env, job: EmailJob): Promise<string[]
   await setDeliveries(job.campaignId, [...eligible], 'sending');
 
   const settings = await loadSettings(job.publicationId);
-  const outcome = await sendBatch({ env, settings, host: publicationHost(publication), post, recipients });
+  const [owner] = await db
+    .select({ email: users.email })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.publicationId, job.publicationId), eq(memberships.role, 'owner')))
+    .limit(1);
+  const outcome = await sendBatch({
+    env,
+    settings,
+    host: publicationHost(publication),
+    replyTo: owner?.email ?? null,
+    showWatermark: limitsFor(publication).watermark,
+    post,
+    recipients,
+  });
 
   const giveUp = job.attempt >= MAX_ATTEMPTS;
   await setDeliveries(job.campaignId, outcome.sent, 'sent');
+  await recordProviderIds(job.campaignId, outcome.providerIds);
   await setDeliveries(job.campaignId, giveUp ? [...outcome.permanent, ...outcome.transient] : outcome.permanent, 'failed');
   await settle(job.campaignId);
   return giveUp ? [] : outcome.transient;

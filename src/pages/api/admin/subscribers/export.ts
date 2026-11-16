@@ -2,7 +2,11 @@ import type { APIRoute } from 'astro';
 import { asc, eq } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../../../db';
 
-const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+// Neutralize spreadsheet formulas (=, +, -, @, tab, CR) before quoting.
+const cell = (raw: string) => {
+  const v = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return /[",\n']/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+};
 
 /** CSV of this publication's list: email, status, language, joined, confirmed. */
 export const GET: APIRoute = async ({ locals }) => {

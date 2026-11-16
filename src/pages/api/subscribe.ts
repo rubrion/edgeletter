@@ -8,6 +8,7 @@ import { isTurnstileEnabled, verifyTurnstile } from '../../lib/turnstile';
 import { sendConfirmationEmail } from '../../lib/confirm-email';
 import { verifyApiKey } from '../../lib/auth';
 import { limitsFor, subscriberCount } from '../../lib/plans';
+import { allow, clientIp } from '../../lib/ratelimit';
 import { publicationHost } from '../../lib/tenant';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -86,6 +87,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!verdict.ok) return json({ error: verdict.error }, 400, cors);
   }
 
+  // Each confirmation is an email from the platform sender: cap the rate per
+  // visitor and per address so the form can't be used to mail-bomb anyone.
+  if (!trusted && (!(await allow(`subscribe:ip:${clientIp(request)}`)) || !(await allow(`subscribe:email:${email}`)))) {
+    return json({ error: 'Too many attempts. Try again in a minute.' }, 429, cors);
+  }
+
   const db = getDbInstance();
   const host = publicationHost(locals.publication);
   const origin = host ? `https://${host}` : new URL(request.url).origin;
@@ -96,9 +103,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
     .where(and(eq(subscribers.publicationId, publicationId), eq(subscribers.email, email)))
     .limit(1);
 
-  // Already active — don't email again, idempotent success.
+  // Already active: nothing to send. Same response as a new sign-up, so the
+  // endpoint can't be used to check whether someone is on the list.
   if (existing && existing.status === 'active') {
-    return json({ ok: true, alreadyActive: true }, 200, cors);
+    return json({ ok: true, pending: true }, 200, cors);
   }
 
   // New addresses count toward the plan's list size.

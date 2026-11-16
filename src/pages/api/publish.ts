@@ -48,7 +48,16 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
   const contentHtml = sanitizeHtml(await marked.parse(contentMd, { async: true }));
   const lang = body.lang === 'pt' ? 'pt' : 'en';
-  const canonicalUrl = /^https:\/\//.test(body.canonical_url ?? '') ? body.canonical_url! : null;
+  // Must be a well-formed https URL; normalizing through URL() also escapes
+  // characters that could break out of the href it ends up in (pages, emails).
+  const canonicalUrl = (() => {
+    try {
+      const u = new URL(body.canonical_url ?? '');
+      return u.protocol === 'https:' && !/["'<>\s]/.test(body.canonical_url ?? '') ? u.toString() : null;
+    } catch {
+      return null;
+    }
+  })();
   const stamped = body.published_at && !Number.isNaN(Date.parse(body.published_at)) ? new Date(body.published_at) : null;
 
   const db = getDbInstance();

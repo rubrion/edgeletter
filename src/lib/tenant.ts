@@ -67,8 +67,9 @@ const lookup = async (host: string): Promise<HostTarget> => {
     if (root && (host === root || host === `www.${root}`)) return { kind: 'platform' };
     if (root && host === `app.${root}`) return { kind: 'app' };
 
+    // Custom domains are a Pro feature: after a downgrade the domain stops serving.
     const custom = await byField('customDomain', host);
-    if (custom) return { kind: 'publication', publication: custom };
+    if (custom && custom.plan === 'pro') return { kind: 'publication', publication: custom };
 
     const [alias] = await getDbInstance()
       .select({ publicationId: publicationAliases.publicationId })

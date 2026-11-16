@@ -53,6 +53,16 @@ export const createCheckout = (input: {
     subscription_data: { metadata: { publication_id: input.publicationId } },
   });
 
+/** Current state of a subscription, straight from Stripe. */
+export const retrieveSubscription = async (id: string) => {
+  const res = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${cfg().STRIPE_SECRET_KEY}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`stripe subscriptions: ${res.status}`);
+  return (await res.json()) as { id: string; status: string; customer: string; metadata?: { publication_id?: string } };
+};
+
 export const createPortal = (customerId: string, returnUrl: string) =>
   call<{ url: string }>('billing_portal/sessions', { customer: customerId, return_url: returnUrl });
 

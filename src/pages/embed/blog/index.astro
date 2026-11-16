@@ -27,13 +27,26 @@ const limit = (() => {
 })();
 const showDate = (q.get('date') ?? settings.widgetShowDate) !== '0';
 const showExcerpts = (q.get('excerpt') ?? settings.widgetShowExcerpts) === '1';
-const maxWidth = q.get('maxWidth') || settings.widgetMaxWidth || 'none';
-const accent = q.get('accent') || settings.widgetAccentOverride || settings.themePrimaryColor;
+// Query values land in an inline style: accept only a hex color / CSS length.
+const cssLength = (v: string | null) => (v && /^\d+(\.\d+)?(px|rem|em|%|vw|vh)?$/.test(v) ? v : null);
+const hexColor = (v: string | null) => (v && /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : null);
+const maxWidth = cssLength(q.get('maxWidth')) || settings.widgetMaxWidth || 'none';
+const accent = hexColor(q.get('accent')) || settings.widgetAccentOverride || settings.themePrimaryColor;
 const fontInherit = q.get('font') === 'inherit';
 const target = q.get('target') === '_self' ? '_self' : '_blank';
-const linkBase =
-  q.get('linkBase') ||
+const defaultLinkBase =
   (target === '_self' ? `${Astro.url.origin}/embed/blog` : `${Astro.url.origin}/blog`);
+// Host sites may point post links elsewhere, but only at http(s) URLs.
+const linkBase = (() => {
+  const raw = q.get('linkBase');
+  if (!raw) return defaultLinkBase;
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString().replace(/\/$/, '') : defaultLinkBase;
+  } catch {
+    return defaultLinkBase;
+  }
+})();
 
 // Hidden only on Pro, and only via the admin setting: never from the query
 // string, or anyone could strip it by editing their iframe `src`.

@@ -2,7 +2,8 @@ import type { APIRoute } from 'astro';
 import { and, eq } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../../../../db';
 
-const VALID = new Set(['active', 'unsubscribed']);
+// Admins can only unsubscribe people; re-subscribing is the reader's own choice.
+const VALID = new Set(['unsubscribed']);
 
 export const POST: APIRoute = async ({ request, params, redirect, locals }) => {
   const id = params.id;

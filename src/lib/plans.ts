@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { getDbInstance, mediaObjects, subscribers, usageCounters, type Publication } from '../db';
 
 /**
@@ -71,12 +71,12 @@ export const emailsThisMonth = async (publicationId: string): Promise<number> =>
   return row?.n ?? 0;
 };
 
-/** Subscribers that count toward the plan: active plus pending confirmations. */
+/** Subscribers that count toward the plan: confirmed and active only (pending sign-ups can't fill a list). */
 export const subscriberCount = async (publicationId: string): Promise<number> => {
   const [row] = await getDbInstance()
     .select({ n: sql<number>`count(*)` })
     .from(subscribers)
-    .where(and(eq(subscribers.publicationId, publicationId), inArray(subscribers.status, ['active', 'pending'])));
+    .where(and(eq(subscribers.publicationId, publicationId), eq(subscribers.status, 'active')));
   return Number(row?.n ?? 0);
 };
 

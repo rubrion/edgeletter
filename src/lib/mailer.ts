@@ -14,8 +14,15 @@ type Env = { RESEND_API_KEY?: string; MAIL_FROM_DOMAIN?: string };
 export const mailFromDomain = (): string =>
   ((env as unknown as Env).MAIL_FROM_DOMAIN ?? '').trim() || 'mail.edgeletter.blog';
 
-export const platformFrom = (name: string, local = 'posts'): string =>
-  `${name.replace(/[<>"]/g, '')} <${local}@${mailFromDomain()}>`;
+/**
+ * Display name for mail from the shared platform domain. Writers choose
+ * their publication name, so strip characters that can fake an address or
+ * header structure and cap the length; the address itself is always ours.
+ */
+export const senderName = (name: string): string =>
+  name.replace(/[<>"@,;:\\\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'EdgeLetter';
+
+export const platformFrom = (name: string, local = 'posts'): string => `${senderName(name)} <${local}@${mailFromDomain()}>`;
 
 export type Mail = {
   to: string;

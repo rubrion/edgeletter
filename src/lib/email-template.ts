@@ -68,7 +68,7 @@ ${E.fontsLink}
         <div class="el-content" style="font-size:17px;line-height:1.7;color:${E.text};">${postHtml}</div>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:36px auto 0;">
           <tr><td style="background:${E.ink};">
-            <a href="${postUrl}" style="display:inline-block;padding:14px 26px;${microStyle(E.card)}font-weight:600;text-decoration:none;">${w.read}</a>
+            <a href="${escapeHtml(postUrl)}" style="display:inline-block;padding:14px 26px;${microStyle(E.card)}font-weight:600;text-decoration:none;">${w.read}</a>
           </td></tr>
         </table>
       </td></tr>

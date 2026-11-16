@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   campaignDeliveries,
   campaigns,
@@ -72,8 +72,13 @@ export const audienceFor = async (publicationId: string, lang: Post['lang']): Pr
   return rows.map((r) => r.id);
 };
 
-/** Retire queued/sending campaigns for a post that have been stuck too long. */
+/**
+ * Retire queued/sending campaigns for a post that have made no delivery
+ * progress for STALE_CAMPAIGN_MS (a large campaign still draining keeps
+ * advancing `campaign_deliveries.updated_at`, so it is left alone).
+ */
 export const retireStaleCampaigns = async (postId: string): Promise<void> => {
+  const cutoff = Date.now() - STALE_CAMPAIGN_MS;
   await getDbInstance()
     .update(campaigns)
     .set({ status: 'failed' })
@@ -81,7 +86,7 @@ export const retireStaleCampaigns = async (postId: string): Promise<void> => {
       and(
         eq(campaigns.postId, postId),
         inArray(campaigns.status, ['queued', 'sending']),
-        lt(campaigns.sentAt, new Date(Date.now() - STALE_CAMPAIGN_MS)),
+        sql`coalesce((SELECT max(d.updated_at) FROM campaign_deliveries d WHERE d.campaign_id = ${campaigns.id}), ${campaigns.sentAt}) < ${cutoff}`,
       ),
     );
 };
@@ -225,7 +230,7 @@ export const settle = async (campaignId: string): Promise<void> => {
         WHEN ${d("'failed','skipped'")} = 0 THEN 'sent'
         WHEN ${d("'sent'")} = 0 THEN 'failed'
         ELSE 'partial' END
-    WHERE id = ${campaignId} AND recipients > 0
+    WHERE id = ${campaignId} AND recipients > 0 AND status <> 'failed'
   `);
 };
 

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { eq } from 'drizzle-orm';
 import { getDbInstance, publications } from '../../../db';
-import { verifyStripeSignature, webhookSecret } from '../../../lib/stripe';
+import { retrieveSubscription, verifyStripeSignature, webhookSecret } from '../../../lib/stripe';
 import { invalidatePublicationCache } from '../../../lib/tenant';
 
 type StripeObject = {
@@ -35,33 +35,30 @@ export const POST: APIRoute = async ({ request }) => {
     invalidatePublicationCache();
   };
 
+  // Webhooks can arrive late or out of order, so subscription events are never
+  // applied from the payload: re-read the subscription's current state instead.
+  const applySubscription = async (subscriptionId: string, pubIdHint?: string) => {
+    const sub = await retrieveSubscription(subscriptionId);
+    const pubId = sub?.metadata?.publication_id ?? pubIdHint;
+    const where = pubId ? eq(publications.id, pubId) : eq(publications.stripeSubscriptionId, subscriptionId);
+    const pro = !!sub && ACTIVE.has(sub.status);
+    await setPlan(where, {
+      plan: pro ? 'pro' : 'free',
+      stripeSubscriptionId: pro ? subscriptionId : null,
+      ...(sub?.customer ? { stripeCustomerId: sub.customer } : {}),
+    });
+  };
+
   switch (event.type) {
     case 'checkout.session.completed': {
       const pubId = obj.metadata?.publication_id ?? obj.client_reference_id;
-      if (pubId) {
-        await setPlan(eq(publications.id, pubId), {
-          plan: 'pro',
-          stripeCustomerId: obj.customer ?? null,
-          stripeSubscriptionId: obj.subscription ?? null,
-        });
-      }
+      if (obj.subscription) await applySubscription(obj.subscription, pubId);
       break;
     }
     case 'customer.subscription.created':
-    case 'customer.subscription.updated': {
-      const pubId = obj.metadata?.publication_id;
-      const where = pubId ? eq(publications.id, pubId) : obj.id ? eq(publications.stripeSubscriptionId, obj.id) : null;
-      if (where) {
-        await setPlan(where, {
-          plan: obj.status && ACTIVE.has(obj.status) ? 'pro' : 'free',
-          stripeSubscriptionId: obj.id ?? null,
-          ...(obj.customer ? { stripeCustomerId: obj.customer } : {}),
-        });
-      }
-      break;
-    }
+    case 'customer.subscription.updated':
     case 'customer.subscription.deleted': {
-      if (obj.id) await setPlan(eq(publications.stripeSubscriptionId, obj.id), { plan: 'free', stripeSubscriptionId: null });
+      if (obj.id) await applySubscription(obj.id, obj.metadata?.publication_id);
       break;
     }
   }

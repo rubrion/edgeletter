@@ -1,7 +1,8 @@
 ---
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import AppLayout from '../../layouts/AppLayout.astro';
 import { getDbInstance, memberships, publications, reports, users } from '../../db';
+import { addMember, EMAIL_RE, findOrCreateUser, normalizeEmail } from '../../lib/auth';
 import { invalidatePublicationCache, publicationOrigin } from '../../lib/tenant';
 
 const db = getDbInstance();
@@ -20,6 +21,17 @@ if (Astro.request.method === 'POST') {
 		await db.update(publications).set({ plan }).where(eq(publications.id, id));
 		invalidatePublicationCache();
 		notice = `Plan set to ${plan}.`;
+	} else if (action === 'grant') {
+		// Recovery path: make someone owner of a publication (e.g. after a migration).
+		const email = normalizeEmail(String(form.get('email') ?? ''));
+		const [pub] = await db.select({ id: publications.id }).from(publications).where(eq(publications.handle, String(form.get('handle') ?? '').trim().toLowerCase())).limit(1);
+		if (!EMAIL_RE.test(email) || !pub) notice = 'Unknown publication or invalid email.';
+		else {
+			const target = await findOrCreateUser(email);
+			await db.delete(memberships).where(and(eq(memberships.userId, target.id), eq(memberships.publicationId, pub.id)));
+			await addMember(target.id, pub.id, 'owner');
+			notice = `${email} is now an owner.`;
+		}
 	} else if (action === 'resolve') {
 		await db.update(reports).set({ status: 'resolved' }).where(eq(reports.id, id));
 		notice = 'Report resolved.';
@@ -52,7 +64,6 @@ const open = await db
 	.orderBy(desc(reports.createdAt))
 	.limit(50);
 const fmt = (d: Date) => d.toISOString().slice(0, 10);
-void memberships; void users;
 ---
 
 <AppLayout title="Staff" current="staff">
@@ -82,6 +93,14 @@ void memberships; void users;
 				</tbody>
 			</table>
 		)}
+
+		<h2>Grant ownership</h2>
+		<form method="post" class="row">
+			<input type="hidden" name="action" value="grant" />
+			<div class="field"><label for="g-handle">Publication handle</label><input id="g-handle" name="handle" type="text" required placeholder="rubrion" /></div>
+			<div class="field"><label for="g-email">Email</label><input id="g-email" name="email" type="email" required /></div>
+			<button type="submit">Make owner</button>
+		</form>
 
 		<h2>Publications</h2>
 		<form method="get" class="row" style="margin-bottom:1rem">

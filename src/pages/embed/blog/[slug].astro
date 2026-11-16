@@ -30,7 +30,7 @@ const themeMode = (() => {
   return v === 'light' || v === 'dark' || v === 'auto' ? v : 'auto';
 })();
 const maxWidth = q.get('maxWidth') || settings.widgetMaxWidth || '720px';
-const accent = q.get('accent') || settings.widgetAccentOverride || settings.themePrimaryColor;
+const accent = hexColor(q.get('accent')) || settings.widgetAccentOverride || settings.themePrimaryColor;
 const fontInherit = q.get('font') === 'inherit';
 const showBackLink = q.get('back') !== '0';
 const backHref = `${Astro.url.origin}/embed/blog${Astro.url.search}`;

@@ -3,6 +3,7 @@ import { and, count, eq } from 'drizzle-orm';
 import AppLayout from '../../layouts/AppLayout.astro';
 import { getDbInstance, memberships, publications } from '../../db';
 import { addMember, rememberPublication } from '../../lib/auth';
+import { allow } from '../../lib/ratelimit';
 import { checkHandle, suggestHandle } from '../../lib/handles';
 import { saveSettings } from '../../lib/settings';
 import { platformDomain } from '../../lib/tenant';
@@ -28,7 +29,8 @@ if (Astro.request.method === 'POST') {
 		.from(memberships)
 		.where(and(eq(memberships.userId, user.id), eq(memberships.role, 'owner')));
 	const owned = Number(row?.n ?? 0);
-	if (!values.name) error = 'Give your publication a name.';
+	if (!(await allow(`onboard:${user.id}`))) error = 'Too many attempts. Try again in a minute.';
+	else if (!values.name) error = 'Give your publication a name.';
 	else if (!check.ok) error = check.error;
 	else if (!user.isStaff && owned >= MAX_OWNED) error = `Each account can run up to ${MAX_OWNED} publications.`;
 	else {

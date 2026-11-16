@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro';
+import { safeNext } from '../../../../lib/redirects';
 import { and, eq } from 'drizzle-orm';
 import { getDbInstance, oauthAccounts, users } from '../../../../db';
 import { findOrCreateUser, startSession } from '../../../../lib/auth';
 import { finishGoogle } from '../../../../lib/google';
 
-const safeNext = (v: unknown): string => (typeof v === 'string' && /^\/(?!\/)[^\s]*$/.test(v) ? v : '/');
 const fail = (msg: string) => '/signin?error=' + encodeURIComponent(msg);
 
 export const GET: APIRoute = async ({ url, cookies, redirect, request }) => {
@@ -43,5 +43,5 @@ export const GET: APIRoute = async ({ url, cookies, redirect, request }) => {
   }
 
   await startSession(cookies, user.id, { secure: url.protocol === 'https:', userAgent: request.headers.get('user-agent') });
-  return redirect(safeNext(saved.next), 302);
+  return redirect(safeNext(saved.next, url.origin), 302);
 };

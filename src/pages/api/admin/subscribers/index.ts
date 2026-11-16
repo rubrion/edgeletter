@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../../../db';
 import { limitsFor, subscriberCount } from '../../../../lib/plans';
 
@@ -37,9 +37,20 @@ export const POST: APIRoute = async ({ request, redirect, locals }) => {
     return redirect(`/admin/subscribers?error=${encodeURIComponent(msg)}`, 303);
   }
   const db = getDbInstance();
+  const [existing] = await db
+    .select({ status: subscribers.status })
+    .from(subscribers)
+    .where(and(eq(subscribers.publicationId, locals.publication.id), eq(subscribers.email, email)))
+    .limit(1);
+  if (existing?.status === 'unsubscribed') {
+    // Opting back in is the reader's decision: they can subscribe again from the site.
+    const msg = 'That person unsubscribed. Only they can re-subscribe, from your site.';
+    if (isJson) return Response.json({ error: msg }, { status: 409 });
+    return redirect(`/admin/subscribers?error=${encodeURIComponent(msg)}`, 303);
+  }
   await db
     .insert(subscribers)
-    .values({ publicationId: locals.publication.id, email })
+    .values({ publicationId: locals.publication.id, email, status: 'active', confirmedAt: new Date() })
     .onConflictDoUpdate({
       target: [subscribers.publicationId, subscribers.email],
       set: { status: sql`'active'` },

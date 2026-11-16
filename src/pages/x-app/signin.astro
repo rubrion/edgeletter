@@ -1,5 +1,6 @@
 ---
 import { env } from 'cloudflare:workers';
+import { safeNext } from '../../lib/redirects';
 import AppLayout from '../../layouts/AppLayout.astro';
 import { EMAIL_RE, issueLoginToken, normalizeEmail } from '../../lib/auth';
 import { sendLoginLink } from '../../lib/auth-email';
@@ -7,9 +8,7 @@ import { googleEnabled } from '../../lib/google';
 import { allow, clientIp } from '../../lib/ratelimit';
 import { isTurnstileEnabled, verifyTurnstile } from '../../lib/turnstile';
 
-// Only same-site relative paths may be used as a post-login destination.
-const safeNext = (v: string | null): string => (v && /^\/(?!\/)[^\s]*$/.test(v) ? v : '/');
-const next = safeNext(Astro.url.searchParams.get('next'));
+const next = safeNext(Astro.url.searchParams.get('next'), Astro.url.origin);
 
 if (Astro.locals.user) return Astro.redirect(next);
 

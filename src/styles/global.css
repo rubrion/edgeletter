@@ -34,9 +34,10 @@ h1, h2, h3, h4, h5, h6 {
 	margin: 0 0 0.5rem 0;
 	color: var(--ink);
 	font-family: var(--font-display-stack);
-	font-weight: 400;
-	letter-spacing: -0.02em;
-	line-height: 1.05;
+	font-weight: var(--display-weight);
+	letter-spacing: var(--display-tracking);
+	word-spacing: var(--display-words);
+	line-height: var(--display-leading);
 }
 h1 { font-size: 3.6em; }
 h2 { font-size: 2.5em; }
@@ -56,8 +57,9 @@ a {
 a:hover { color: var(--accent-deep); }
 
 p { margin: 0 0 1em; }
-.prose p { margin-bottom: 1.4em; }
-.prose h2, .prose h3, .prose h4 { margin-top: 1.6em; }
+.prose p { margin-bottom: 1.5em; }
+.prose h2, .prose h3, .prose h4 { margin-top: 1.9em; margin-bottom: 0.6em; }
+.prose img, .prose pre, .prose figure, .prose video { margin: 2.2em 0; }
 .prose ul, .prose ol { padding-left: 1.3em; }
 .prose li { margin-bottom: 0.4em; }
 .prose li::marker { color: var(--accent); }
@@ -106,10 +108,12 @@ blockquote {
 	padding: 0.2em 0 0.2em 1.4em;
 	border-left: 1px solid var(--accent);
 	font-family: var(--font-display-stack);
+	font-weight: var(--display-weight);
+	word-spacing: var(--display-words);
 	font-style: italic;
 	font-size: 1.45em;
 	line-height: 1.3;
-	letter-spacing: -0.01em;
+	letter-spacing: var(--display-tracking);
 	color: var(--ink);
 }
 blockquote p { margin-bottom: 0.5em; }

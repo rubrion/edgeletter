@@ -72,6 +72,7 @@ const langLabel = lang === 'en' ? 'PT' : 'EN';
 
 <style>
 	header {
+		view-transition-name: site-header;
 		position: relative;
 		z-index: 10;
 		margin: 0;
@@ -96,8 +97,10 @@ const langLabel = lang === 'en' ? 'PT' : 'EN';
 		align-items: center;
 		gap: 0.7rem;
 		font-family: var(--font-display-stack);
+		font-weight: var(--display-weight);
+		word-spacing: var(--display-words);
 		font-size: 1.65rem;
-		letter-spacing: -0.02em;
+		letter-spacing: var(--display-tracking);
 		line-height: 1;
 		color: var(--ink);
 		text-decoration: none;

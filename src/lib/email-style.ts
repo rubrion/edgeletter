@@ -10,10 +10,10 @@ export const EMAIL = {
   text: '#3A3129',
   muted: '#7A6E62',
   hairline: '#D8D3CA',
-  display: "'Instrument Serif', 'Cormorant Garamond', Georgia, 'Times New Roman', serif",
+  display: "'Cormorant Garamond', Georgia, 'Times New Roman', serif",
   body: "'Newsreader', Georgia, 'Times New Roman', serif",
   fontsLink:
-    '<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Newsreader:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">',
+    '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Newsreader:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">',
 } as const;
 
 const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)));

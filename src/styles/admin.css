@@ -31,15 +31,16 @@ a:hover { color: var(--accent-deep); }
 .wrap > .card { padding: 2.75rem 3rem 2.5rem; }
 
 .page-head { text-align: center; margin-bottom: 2rem; }
-.page-head .eyebrow { font-size: 1.6rem; }
+.page-head .eyebrow { font-size: 1.4rem; }
 
 h1 {
 	margin: 0 0 0.4rem;
 	font-family: var(--font-display-stack);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 2.6rem;
-	line-height: 1.05;
-	letter-spacing: -0.02em;
+	line-height: var(--display-leading);
+	letter-spacing: var(--display-tracking);
+	word-spacing: var(--display-words);
 	color: var(--ink);
 }
 h2 {

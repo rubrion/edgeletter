@@ -58,7 +58,7 @@ ${E.fontsLink}</head>
         ${logoUrl ? `<img src="${logoUrl}" width="36" height="36" alt="" style="display:block;margin:0 auto 10px;border:0;">` : ''}<p style="margin:0;${microStyle(deep)}font-size:12px;font-weight:600;text-shadow:0 1px 0 rgba(255,255,255,0.14);">[&nbsp;${escapeHtml(clientName)}&nbsp;]</p>
       </td></tr>
       <tr><td align="center" style="background:${E.card};border:1px solid ${E.hairline};border-top:0;padding:40px 40px 34px;">
-        <h1 style="margin:0 0 16px;font-family:${E.display};font-weight:400;font-size:36px;line-height:1.05;letter-spacing:-0.02em;color:${E.ink};">${w.title}</h1>
+        <h1 style="margin:0 0 16px;font-family:${E.display};font-weight:500;font-size:38px;line-height:1.12;letter-spacing:0.005em;word-spacing:0.05em;color:${E.ink};">${w.title}</h1>
         <p style="margin:0 0 28px;font-size:16px;line-height:1.65;color:${E.text};">${w.body(escapeHtml(clientName))}</p>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 26px;">
           <tr><td style="background:${themeColor};">

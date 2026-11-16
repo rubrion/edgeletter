@@ -1,0 +1,25 @@
+---
+// Scroll-reveal driver for elements marked .reveal (see tokens.css).
+---
+<script>
+	const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const items = document.querySelectorAll<HTMLElement>('.reveal');
+	if (!reduce && 'IntersectionObserver' in window) {
+		(window as unknown as { __edgeReveal?: boolean }).__edgeReveal = true;
+		document.documentElement.classList.add('reveal-ready');
+		const io = new IntersectionObserver(
+			(entries) => {
+				for (const e of entries) {
+					if (!e.isIntersecting) continue;
+					const el = e.target as HTMLElement;
+					el.classList.add('is-in');
+					io.unobserve(el);
+					// After the entrance, let the hover lift take over transform.
+					el.addEventListener('transitionend', () => el.classList.add('settled'), { once: true });
+				}
+			},
+			{ rootMargin: '0px 0px -8% 0px', threshold: 0.12 },
+		);
+		items.forEach((el) => io.observe(el));
+	}
+</script>

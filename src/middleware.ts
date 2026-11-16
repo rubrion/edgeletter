@@ -145,30 +145,38 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
       if (under(path, '/staff') && !user.isStaff) return page(403, 'Forbidden', 'Staff only.');
 
-      if (isAdminSurface(path) || needsPublicationInApp(path)) {
-        // Active publication: ?pub= wins (and is remembered), else the cookie,
-        // else the first membership. Membership is re-checked on every request.
-        const wanted = url.searchParams.get('pub') ?? cookies.get(PUB_COOKIE)?.value ?? null;
-        let publicationId = wanted;
-        let role = publicationId ? await roleIn(user.id, publicationId) : null;
-        if (!role) {
-          const first = (await membershipsOf(user.id))[0];
-          if (!first) return isApi ? jsonError(403, 'no publication') : redirect('/onboarding', 302);
+      // Active publication: ?pub= wins (and is remembered), else the cookie,
+      // else the first membership. Membership is re-checked on every request.
+      // Resolved on every signed-in page so the app bar always shows the
+      // publication's sections; only publication-scoped pages require one.
+      const required = isAdminSurface(path) || needsPublicationInApp(path);
+      const wanted = url.searchParams.get('pub') ?? cookies.get(PUB_COOKIE)?.value ?? null;
+      let publicationId = wanted;
+      let role = publicationId ? await roleIn(user.id, publicationId) : null;
+      if (!role) {
+        const first = (await membershipsOf(user.id))[0];
+        if (first) {
           publicationId = first.publication.id;
           role = first.role;
+        } else if (required) {
+          return isApi ? jsonError(403, 'no publication') : redirect('/onboarding', 302);
         }
-        if (publicationId !== cookies.get(PUB_COOKIE)?.value) rememberPublication(cookies, publicationId!, secure);
-        const publication = await publicationById(publicationId!);
-        if (!publication) return isApi ? jsonError(404, 'publication not found') : redirect('/', 302);
-
-        if (isOwnerOnly(path) && role !== 'owner') {
-          return isApi ? jsonError(403, 'owner only') : page(403, 'Owners only', 'Ask the publication owner to make this change.');
+      }
+      if (role && publicationId) {
+        if (publicationId !== cookies.get(PUB_COOKIE)?.value) rememberPublication(cookies, publicationId, secure);
+        const publication = await publicationById(publicationId);
+        if (!publication) {
+          if (required) return isApi ? jsonError(404, 'publication not found') : redirect('/', 302);
+        } else {
+          if (required && isOwnerOnly(path) && role !== 'owner') {
+            return isApi ? jsonError(403, 'owner only') : page(403, 'Owners only', 'Ask the publication owner to make this change.');
+          }
+          if (publication.status === 'suspended' && (under(path, '/api/publish') || under(path, '/api/media'))) {
+            return jsonError(403, 'publication suspended');
+          }
+          locals.publication = publication;
+          locals.role = role;
         }
-        if (publication.status === 'suspended' && (under(path, '/api/publish') || under(path, '/api/media'))) {
-          return jsonError(403, 'publication suspended');
-        }
-        locals.publication = publication;
-        locals.role = role;
       }
 
       if (under(path, '/admin') || isApi) return next();

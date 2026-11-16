@@ -307,6 +307,42 @@ export const reports = sqliteTable(
   (t) => ({ reports_status_idx: index('reports_status_idx').on(t.status, t.createdAt) }),
 );
 
+export const feedSources = sqliteTable(
+  'feed_sources',
+  {
+    id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+    publicationId: text('publication_id').notNull().references(() => publications.id, { onDelete: 'cascade' }),
+    url: text('url').notNull(),
+    lang: text('lang', { enum: ['en', 'pt'] }).notNull().default('en'),
+    /** Email new items to subscribers (the initial backfill never is). */
+    autoSend: integer('auto_send', { mode: 'boolean' }).notNull().default(false),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    etag: text('etag'),
+    lastModified: text('last_modified'),
+    lastCheckedAt: ts('last_checked_at'),
+    lastSuccessAt: ts('last_success_at'),
+    lastError: text('last_error'),
+    failCount: integer('fail_count').notNull().default(0),
+    createdAt: ts('created_at').notNull().$defaultFn(now),
+  },
+  (t) => ({
+    feed_sources_publication_url_unique: uniqueIndex('feed_sources_publication_url_unique').on(t.publicationId, t.url),
+    feed_sources_due_idx: index('feed_sources_due_idx').on(t.enabled, t.lastCheckedAt),
+  }),
+);
+
+export const feedItems = sqliteTable(
+  'feed_items',
+  {
+    feedId: text('feed_id').notNull().references(() => feedSources.id, { onDelete: 'cascade' }),
+    guidHash: text('guid_hash').notNull(),
+    postId: text('post_id'),
+    createdAt: ts('created_at').notNull().$defaultFn(now),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.feedId, t.guidHash] }) }),
+);
+
+export type FeedSource = typeof feedSources.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
 export type Role = Membership['role'];

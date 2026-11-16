@@ -347,9 +347,10 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
     <div style={styles.shell}>
       <aside style={styles.sidebar}>
         <button onClick={newPost} style={styles.newBtn}>
-          + New post
+          New post
         </button>
-        <div style={styles.list}>
+        <span style={styles.sidebarLabel}>Manuscripts</span>
+        <div style={styles.list} className="ed-list">
           {posts.length === 0 && <p style={styles.muted}>No posts yet.</p>}
           {posts.map((p) => (
             <button
@@ -363,10 +364,10 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
               <span style={styles.listTitle}>{p.title || '(untitled)'}</span>
               <span style={styles.listMeta}>
                 {p.lastSentAt
-                  ? `✓ sent ${formatSentAt(p.lastSentAt)}`
+                  ? `[ Sent · ${formatSentAt(p.lastSentAt)} ]`
                   : p.isPublished
-                    ? '● published'
-                    : '○ draft'}
+                    ? '[ Published ]'
+                    : '[ Draft ]'}
               </span>
             </button>
           ))}
@@ -478,7 +479,7 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
             }}
             spellCheck
           />
-          <div style={styles.preview} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          <div style={styles.preview} className="ed-preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
         </div>
         <div style={styles.actions}>
           {aiUsage && (
@@ -494,7 +495,7 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
           )}
           {message && <span style={styles.message}>{message}</span>}
           {wasSent && draft.lastSentAt && (
-            <span style={styles.sentBadge}>✓ Sent {formatSentAt(draft.lastSentAt)}</span>
+            <span style={styles.sentBadge}>[ Sent · {formatSentAt(draft.lastSentAt)} ]</span>
           )}
           <div style={{ flex: 1 }} />
           {isExisting && (
@@ -532,35 +533,52 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
   );
 }
 
+// Stationery tokens come from src/styles/admin.css (loaded by AdminHead).
+const micro: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  letterSpacing: '0.15em',
+  textTransform: 'uppercase',
+};
+const sharpBtn: React.CSSProperties = {
+  ...micro,
+  padding: '0.7rem 1.3rem',
+  borderRadius: 0,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
+};
+
 const styles: Record<string, React.CSSProperties> = {
-  shell: { display: 'grid', gridTemplateColumns: '260px 1fr', height: '100%' },
-  sidebar: { borderRight: '1px solid #e5e5e8', padding: '1rem', display: 'flex', flexDirection: 'column', background: '#fafafb' },
-  newBtn: { padding: '0.6rem', background: 'var(--theme)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', marginBottom: '1rem' },
-  list: { display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto', flex: 1 },
-  listItem: { textAlign: 'left', padding: '0.6rem 0.75rem', background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.2rem' },
-  listItemActive: { background: '#fff', boxShadow: '0 0 0 1px #e5e5e8' },
-  listTitle: { fontSize: '0.9rem', fontWeight: 500 },
-  listMeta: { fontSize: '0.75rem', color: '#888' },
-  muted: { color: '#888', fontSize: '0.85rem' },
-  main: { display: 'flex', flexDirection: 'column', height: '100%' },
-  fields: { display: 'flex', gap: '0.5rem', padding: '1rem', borderBottom: '1px solid #e5e5e8', background: '#fff' },
-  titleInput: { flex: 1, fontSize: '1.25rem', fontWeight: 600, border: 'none', outline: 'none', padding: '0.5rem' },
-  slugInput: { width: 220, fontSize: '0.9rem', color: '#666', border: '1px solid #e5e5e8', borderRadius: 6, padding: '0.5rem 0.75rem' },
-  toolbar: { display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 1rem', borderBottom: '1px solid #e5e5e8', background: '#fff' },
-  toolBtn: { padding: '0.35rem 0.7rem', fontSize: '0.85rem', background: '#fff', color: '#1a1a1a', border: '1px solid #e5e5e8', borderRadius: 6, cursor: 'pointer' },
-  toolBtnAi: { background: '#f5f0ff', color: '#5b21b6', border: '1px solid #ddd6fe' },
-  toolDivider: { display: 'inline-block', width: 1, height: '1.4rem', background: '#e5e5e8', margin: '0 0.25rem' },
-  toolHint: { fontSize: '0.75rem', color: '#888' },
-  split: { flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', overflow: 'hidden' },
-  textarea: { padding: '1rem', border: 'none', borderRight: '1px solid #e5e5e8', outline: 'none', resize: 'none', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.95rem', lineHeight: 1.6 },
-  textareaDrop: { background: '#f0f7ff', boxShadow: 'inset 0 0 0 2px var(--theme)' },
-  preview: { padding: '1rem 1.5rem', overflowY: 'auto', background: '#fff', lineHeight: 1.6 },
-  actions: { display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', borderTop: '1px solid #e5e5e8', background: '#fff' },
-  message: { fontSize: '0.85rem', color: '#555' },
-  aiUsage: { fontSize: '0.75rem', color: '#5b21b6', background: '#f5f0ff', border: '1px solid #ddd6fe', padding: '0.25rem 0.6rem', borderRadius: 999, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap' },
-  aiUsageDanger: { color: '#b3261e', background: '#fdecec', border: '1px solid #f5c2c2' },
-  sentBadge: { fontSize: '0.8rem', color: '#3a7d44', background: '#eaf6ec', padding: '0.25rem 0.6rem', borderRadius: 999 },
-  btnSecondary: { padding: '0.5rem 1rem', background: '#fff', color: '#1a1a1a', border: '1px solid #e5e5e8', borderRadius: 6, cursor: 'pointer' },
-  btnDanger: { padding: '0.5rem 1rem', background: '#fff', color: '#c1121f', border: '1px solid #f3c4c4', borderRadius: 6, cursor: 'pointer' },
-  btnPrimary: { padding: '0.5rem 1.25rem', background: 'var(--theme)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' },
+  shell: { display: 'grid', gridTemplateColumns: '280px 1fr', height: '100%' },
+  sidebar: { borderRight: 'var(--hairline)', padding: '1.5rem 1.25rem', display: 'flex', flexDirection: 'column', background: 'var(--paper)' },
+  newBtn: { ...sharpBtn, background: 'var(--ink)', color: 'var(--card)', border: '1px solid var(--ink)', marginBottom: '1.75rem' },
+  sidebarLabel: { ...micro, color: 'var(--accent)', paddingBottom: '0.6rem', marginBottom: '0.6rem', borderBottom: 'var(--hairline)' },
+  list: { display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto', flex: 1, paddingTop: '0.25rem' },
+  listItem: { textAlign: 'left', padding: '0.85rem 0.9rem', background: 'transparent', border: '1px solid transparent', borderRadius: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontFamily: 'inherit', color: 'var(--ink)' },
+  listItemActive: { background: 'var(--card)', border: 'var(--hairline)', boxShadow: 'var(--shadow-paper)', borderLeft: '2px solid var(--accent)' },
+  listTitle: { fontFamily: 'var(--font-display-stack)', fontSize: '1.2rem', lineHeight: 1.1, letterSpacing: '-0.01em' },
+  listMeta: { ...micro, fontSize: 10, color: 'var(--muted)' },
+  muted: { color: 'var(--muted)', fontSize: '0.9rem', fontStyle: 'italic' },
+  main: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: 'var(--card)' },
+  fields: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem 1.75rem', borderBottom: 'var(--hairline)' },
+  titleInput: { flex: 1, minWidth: 0, fontFamily: 'var(--font-display-stack)', fontSize: '2rem', letterSpacing: '-0.02em', lineHeight: 1.1, border: 'none', outline: 'none', padding: '0.25rem 0', background: 'transparent', color: 'var(--ink)', boxShadow: 'none' },
+  slugInput: { width: 240, flex: 'none', fontSize: '0.85rem', fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace" },
+  toolbar: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', padding: '0.7rem 1.75rem', borderBottom: 'var(--hairline)', background: 'var(--paper)' },
+  toolBtn: { ...micro, fontSize: 10.5, padding: '0.45rem 0.8rem', background: 'var(--card)', color: 'var(--ink)', border: 'var(--hairline)', borderRadius: 0, cursor: 'pointer', fontFamily: 'inherit' },
+  toolBtnAi: { background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid var(--accent)' },
+  toolDivider: { display: 'inline-block', width: 1, height: '1.3rem', background: 'var(--hairline-color)', margin: '0 0.35rem' },
+  toolHint: { fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--muted)', marginLeft: 'auto' },
+  split: { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', overflow: 'hidden' },
+  textarea: { padding: '1.5rem 1.75rem', border: 'none', borderRight: 'var(--hairline)', borderRadius: 0, outline: 'none', resize: 'none', minHeight: 0, height: '100%', background: '#FBFAF7', color: 'var(--ink)', boxShadow: 'none', fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: '0.9rem', lineHeight: 1.7 },
+  textareaDrop: { background: 'color-mix(in srgb, var(--accent) 6%, #FBFAF7)', boxShadow: 'inset 0 0 0 1px var(--accent)' },
+  preview: { padding: '2rem 2.5rem', overflowY: 'auto', background: 'var(--card)', lineHeight: 1.7, fontSize: '1.02rem' },
+  actions: { display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.9rem 1.75rem', borderTop: 'var(--hairline)', background: 'var(--paper)' },
+  message: { fontSize: '0.9rem', fontStyle: 'italic', color: 'var(--muted)' },
+  aiUsage: { ...micro, fontSize: 10, color: 'var(--accent-deep)', whiteSpace: 'nowrap' },
+  aiUsageDanger: { color: '#9C2F14' },
+  sentBadge: { ...micro, fontSize: 10.5, color: '#4F6B3A', whiteSpace: 'nowrap' },
+  btnSecondary: { ...sharpBtn, background: 'transparent', color: 'var(--ink)', border: '1px solid var(--ink)' },
+  btnDanger: { ...sharpBtn, background: 'transparent', color: '#9C2F14', border: '1px solid transparent', padding: '0.7rem 0.5rem' },
+  btnPrimary: { ...sharpBtn, background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid var(--accent)' },
 };

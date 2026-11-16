@@ -3,7 +3,7 @@ import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import Header from '../components/Header.astro';
-import { getLang, type Lang } from '../i18n';
+import { getLang, useTranslations, type Lang } from '../i18n';
 
 interface Props {
 	title: string;
@@ -11,12 +11,17 @@ interface Props {
 	pubDate?: Date | null;
 	lang?: Lang;
 	canonical?: string;
+	/** Script eyebrow above the title; defaults to the post eyebrow. */
+	eyebrow?: string;
 }
 
 const { title, description, pubDate, lang: langProp, canonical } = Astro.props;
 const lang = langProp ?? getLang(Astro.request);
+const t = useTranslations(lang);
+const eyebrow = Astro.props.eyebrow ?? t('post.eyebrow');
 ---
 
+<!doctype html>
 <html lang={lang}>
 	<head>
 		<BaseHead
@@ -26,47 +31,69 @@ const lang = langProp ?? getLang(Astro.request);
 			publishedAt={pubDate ?? null}
 			canonical={canonical}
 		/>
-		<style>
-			main {
-				width: calc(100% - 2em);
-				max-width: 100%;
-				margin: 0;
-			}
-			.prose {
-				width: 720px;
-				max-width: calc(100% - 2em);
-				margin: auto;
-				padding: 1em;
-				color: rgb(var(--gray-dark));
-			}
-			.title {
-				margin-bottom: 1em;
-				padding: 1em 0;
-				text-align: center;
-				line-height: 1;
-			}
-			.title h1 { margin: 0 0 0.5em 0; }
-			.date { margin-bottom: 0.5em; color: rgb(var(--gray)); }
-		</style>
 	</head>
 	<body>
 		<Header />
 		<main>
 			<article>
-				<div class="prose">
-					<div class="title">
-						{pubDate && (
-							<div class="date">
-								<FormattedDate date={pubDate} lang={lang} />
-							</div>
-						)}
-						<h1>{title}</h1>
-						<hr />
+				<header class="title">
+					<span class="eyebrow">{eyebrow}</span>
+					<h1>{title}</h1>
+					{pubDate ? (
+						<div class="micro bracket date">
+							<FormattedDate date={pubDate} lang={lang} />
+						</div>
+					) : (
+						<div class="ornament" aria-hidden="true">✦</div>
+					)}
+				</header>
+				<div class="sheet card">
+					<div class="prose">
+						<slot />
 					</div>
-					<slot />
 				</div>
 			</article>
 		</main>
 		<Footer />
 	</body>
 </html>
+
+<style>
+	main {
+		width: 860px;
+	}
+	.title {
+		text-align: center;
+		margin: 0 auto 3rem;
+		max-width: 760px;
+	}
+	.title h1 {
+		font-size: clamp(2.6rem, 7vw, 4.6rem);
+		margin: 0 0 1.25rem;
+	}
+	.date {
+		color: var(--muted);
+	}
+	.sheet {
+		padding: 4rem 4.5rem 3.5rem;
+	}
+	.prose {
+		max-width: 640px;
+		margin: 0 auto;
+		color: var(--text);
+	}
+	/* Editorial drop cap on the opening paragraph */
+	.prose > :global(p:first-of-type)::first-letter,
+	.prose > :global(div > p:first-of-type)::first-letter {
+		float: left;
+		font-family: var(--font-display-stack);
+		font-size: 4.4em;
+		line-height: 0.82;
+		padding: 0.06em 0.12em 0 0;
+		color: var(--accent);
+	}
+	@media (max-width: 720px) {
+		.sheet { padding: 2.25rem 1.4rem 2rem; }
+		.title { margin-bottom: 2rem; }
+	}
+</style>

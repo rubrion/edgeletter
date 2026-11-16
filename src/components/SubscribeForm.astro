@@ -11,8 +11,10 @@ const t = useTranslations(lang);
 const heading = Astro.props.heading ?? t('subscribe.heading');
 ---
 
-<section class="subscribe">
-	<h3>{heading}</h3>
+<div class="letter card">
+	<span class="eyebrow">{t('subscribe.eyebrow')}</span>
+	<h3 class="display">{heading}</h3>
+	<p class="note">{t('subscribe.note')}</p>
 	<form
 		class="subscribe-form"
 		method="POST"
@@ -32,10 +34,10 @@ const heading = Astro.props.heading ?? t('subscribe.heading');
 			autocomplete="email"
 			required
 		/>
-		<button type="submit">{t('subscribe.button')}</button>
+		<button type="submit" class="btn">{t('subscribe.button')}</button>
 	</form>
-	<p class="subscribe-status" data-subscribe-status></p>
-</section>
+	<p class="subscribe-status" data-subscribe-status aria-live="polite"></p>
+</div>
 
 <script>
 	const form = document.querySelector<HTMLFormElement>('form[data-subscribe]');
@@ -71,14 +73,54 @@ const heading = Astro.props.heading ?? t('subscribe.heading');
 </script>
 
 <style>
-	.subscribe {
+	.letter {
+		position: relative;
+		max-width: 560px;
+		margin: 0 auto;
+		padding: 2.75rem 2.5rem 2.25rem;
 		text-align: center;
-		padding: 2em 1em;
-		background: var(--bg-subscribe, rgb(var(--gray-light)));
-		transition: background-color 0.2s;
 	}
-	.subscribe h3 {
-		margin: 0;
-		font-size: 1.4em;
+	.letter h3 {
+		margin: 0 0 0.6rem;
+		font-size: 2.4rem;
+	}
+	.note {
+		margin: 0 0 1.75rem;
+		color: var(--muted);
+		font-style: italic;
+		font-size: 0.95rem;
+	}
+	.subscribe-form {
+		display: flex;
+		gap: 0.75rem;
+		align-items: stretch;
+		max-width: 440px;
+		margin: 0 auto;
+	}
+	.subscribe-form input[type='email'] {
+		flex: 1;
+		min-width: 0;
+		padding: 0.7rem 0.1rem;
+		border: none;
+		border-bottom: 1px solid var(--ink);
+		border-radius: 0;
+		background: transparent;
+		color: var(--ink);
+		font-size: 1rem;
+		font-style: italic;
+	}
+	.subscribe-form input[type='email']::placeholder { color: var(--muted); opacity: 0.8; }
+	.subscribe-form input[type='email']:focus { outline: none; border-bottom-color: var(--accent); }
+	.subscribe-status {
+		min-height: 1.4em;
+		margin: 1rem 0 0;
+		font-size: 0.9rem;
+		font-style: italic;
+		color: var(--muted);
+	}
+	@media (max-width: 520px) {
+		.letter { padding: 2.25rem 1.25rem 1.75rem; }
+		.letter h3 { font-size: 1.9rem; }
+		.subscribe-form { flex-direction: column; }
 	}
 </style>

@@ -1,4 +1,6 @@
 ---
+import { Font } from 'astro:assets';
+import '../../../styles/embed.css';
 import { desc, eq } from 'drizzle-orm';
 import { getDbInstance, posts } from '../../../db';
 import { loadSettings, hexToRgbTuple } from '../../../lib/settings';
@@ -63,7 +65,7 @@ const list = rows.map((r) => ({
     : '',
 }));
 
-const fontStack = fontInherit ? 'inherit' : 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const fontStack = fontInherit ? 'inherit' : "var(--font-body, 'Newsreader'), Georgia, serif";
 
 // Inline CSS variables on <html> so they're deterministic regardless of bundler scoping.
 const rootStyle = [
@@ -92,65 +94,8 @@ const dataTheme = themeMode === 'auto' ? null : themeMode;
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>{settings.clientName} — {t('blog.title')}</title>
-    <style is:global>
-      html, body {
-        margin: 0; padding: 0;
-        background: rgb(var(--bg));
-        color: rgb(var(--text));
-        font-family: var(--fontStack);
-        font-size: 15px;
-        line-height: 1.55;
-        color-scheme: light;
-      }
-      html[data-theme="dark"] body, html[data-theme="dark"] {
-        background: rgb(var(--bgDark));
-        color: rgb(var(--textDark));
-        color-scheme: dark;
-      }
-      @media (prefers-color-scheme: dark) {
-        html:not([data-theme="light"]) { color-scheme: dark; }
-        html:not([data-theme="light"]) body { background: rgb(var(--bgDark)); color: rgb(var(--textDark)); }
-        html:not([data-theme="light"]) .post-list li { border-color: rgb(var(--borderDark)); }
-        html:not([data-theme="light"]) .title { color: rgb(var(--headingDark)); }
-        html:not([data-theme="light"]) .date { color: rgb(var(--mutedDark)); }
-        html:not([data-theme="light"]) .excerpt { color: rgb(var(--mutedDark)); }
-        html:not([data-theme="light"]) .empty { color: rgb(var(--mutedDark)); }
-      }
-      .wrap {
-        max-width: var(--maxWidth);
-        margin: 0 auto;
-        padding: 1rem 1.1rem;
-        box-sizing: border-box;
-      }
-      .post-list { list-style: none; margin: 0; padding: 0; }
-      .post-list li {
-        border-bottom: 1px solid rgb(var(--border));
-        padding: 0.85rem 0;
-      }
-      html[data-theme="dark"] .post-list li { border-color: rgb(var(--borderDark)); }
-      .post-list li:last-child { border-bottom: none; }
-      a.post { display: block; text-decoration: none; color: inherit; }
-      .row { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
-      .title { font-weight: 600; color: rgb(var(--heading)); }
-      html[data-theme="dark"] .title { color: rgb(var(--headingDark)); }
-      a.post:hover .title { color: var(--accent); }
-      .date { color: rgb(var(--muted)); font-size: 0.85em; flex-shrink: 0; }
-      html[data-theme="dark"] .date { color: rgb(var(--mutedDark)); }
-      .excerpt { color: rgb(var(--muted)); font-size: 0.9em; margin-top: 0.25rem; }
-      html[data-theme="dark"] .excerpt { color: rgb(var(--mutedDark)); }
-      .empty { color: rgb(var(--muted)); padding: 1rem 0; }
-      .ep-wm {
-        display: inline-flex; align-items: center; gap: 6px;
-        margin: 1.25rem auto 0.25rem; padding: 4px 10px;
-        background: rgba(15,17,25,0.78); color: #fff;
-        border-radius: 999px; font-size: 11px; line-height: 1;
-        text-decoration: none; opacity: 0.7; transition: opacity .15s;
-        width: fit-content;
-      }
-      .ep-wm:hover { opacity: 1; }
-      .ep-wm img { display: block; }
-      .ep-wm-row { display: flex; justify-content: center; }
-    </style>
+    <Font cssVariable="--font-display" preload />
+    <Font cssVariable="--font-body" preload />
   </head>
   <body>
     <div class="wrap">
@@ -164,7 +109,7 @@ const dataTheme = themeMode === 'auto' ? null : themeMode;
                 <div class="row">
                   <span class="title">{p.title}</span>
                   {showDate && p.publishedAt && (
-                    <span class="date">{new Date(p.publishedAt).toLocaleDateString()}</span>
+                    <span class="date micro">{new Date(p.publishedAt).toLocaleDateString()}</span>
                   )}
                 </div>
                 {showExcerpts && p.excerpt && <div class="excerpt">{p.excerpt}…</div>}
@@ -175,13 +120,8 @@ const dataTheme = themeMode === 'auto' ? null : themeMode;
       )}
       {showWatermark && (
         <div class="ep-wm-row">
-          <a class="ep-wm" href="https://rubrion.ai/?utm_source=edgeletter-widget"
-             target="_blank" rel="noopener nofollow"
-             aria-label="Powered by Rubrion">
-            <img src="https://media.rubrion.ai/images/logo_rubrion_ver4_white.svg"
-                 alt="Rubrion" width="14" height="14" loading="lazy" />
-            <span>Powered by Rubrion</span>
-          </a>
+          <a class="ep-wm micro" href="https://rubrion.ai/?utm_source=edgeletter-widget"
+             target="_blank" rel="noopener nofollow">Powered by Rubrion</a>
         </div>
       )}
     </div>

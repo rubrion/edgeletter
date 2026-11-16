@@ -34,38 +34,6 @@ const clientFont = rawFont
   .replace(/^["']|["']$/g, '')
   .trim();
 
-const fontConfig = clientFont
-  ? {
-      provider: fontProviders.google(),
-      name: clientFont,
-      cssVariable: '--font-atkinson',
-      fallbacks: ['sans-serif'],
-      weights: [400, 700],
-      styles: ['normal'],
-    }
-  : {
-      provider: fontProviders.local(),
-      name: 'Atkinson',
-      cssVariable: '--font-atkinson',
-      fallbacks: ['sans-serif'],
-      options: {
-        variants: [
-          {
-            src: ['./src/assets/fonts/atkinson-regular.woff'],
-            weight: 400,
-            style: 'normal',
-            display: 'swap',
-          },
-          {
-            src: ['./src/assets/fonts/atkinson-bold.woff'],
-            weight: 700,
-            style: 'normal',
-            display: 'swap',
-          },
-        ],
-      },
-    };
-
 // https://astro.build/config
 export default defineConfig({
   site: `https://${clientDomain}`,
@@ -78,7 +46,34 @@ export default defineConfig({
     }),
   ],
 
-  fonts: [fontConfig],
+  // Stationery type system: condensed editorial serif for display, script for
+  // eyebrows, and a readable serif for body. CLIENT_FONT overrides body only.
+  fonts: [
+    {
+      provider: fontProviders.google(),
+      name: 'Instrument Serif',
+      cssVariable: '--font-display',
+      fallbacks: ['Georgia', 'serif'],
+      weights: [400],
+      styles: ['normal', 'italic'],
+    },
+    {
+      provider: fontProviders.google(),
+      name: 'Pinyon Script',
+      cssVariable: '--font-script',
+      fallbacks: ['cursive'],
+      weights: [400],
+      styles: ['normal'],
+    },
+    {
+      provider: fontProviders.google(),
+      name: clientFont || 'Newsreader',
+      cssVariable: '--font-body',
+      fallbacks: ['Georgia', 'serif'],
+      weights: [400, 500, 600],
+      styles: ['normal', 'italic'],
+    },
+  ],
 
   adapter: cloudflare(),
 });

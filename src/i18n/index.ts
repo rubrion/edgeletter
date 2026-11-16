@@ -22,6 +22,15 @@ const translations = {
 
     'index.latestPosts': 'Latest posts',
     'index.allPosts': 'All posts →',
+    'index.eyebrow': 'The Correspondence',
+    'index.featured': 'Featured',
+    'index.latestLabel': 'Latest',
+
+    'blog.eyebrow': 'From the archive',
+    'post.eyebrow': 'Dispatch',
+    'subscribe.eyebrow': 'By post',
+    'subscribe.note': 'Delivered to your inbox. Unsubscribe anytime.',
+    'about.eyebrow': 'A few words',
 
     'blog.title': 'Blog',
     'blog.empty': 'No posts yet.',
@@ -50,6 +59,15 @@ const translations = {
 
     'index.latestPosts': 'Últimas publicações',
     'index.allPosts': 'Todas as publicações →',
+    'index.eyebrow': 'A Correspondência',
+    'index.featured': 'Destaque',
+    'index.latestLabel': 'Recentes',
+
+    'blog.eyebrow': 'Do arquivo',
+    'post.eyebrow': 'Despacho',
+    'subscribe.eyebrow': 'Pelo correio',
+    'subscribe.note': 'Entregue na sua caixa de entrada. Cancele quando quiser.',
+    'about.eyebrow': 'Algumas palavras',
 
     'blog.title': 'Blog',
     'blog.empty': 'Nenhuma publicação ainda.',

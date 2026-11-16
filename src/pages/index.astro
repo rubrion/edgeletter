@@ -18,11 +18,23 @@ const tagline = settings.clientTagline || 'Notes, essays, and announcements — 
 
 const db = getDbInstance();
 const recent = await db
-	.select({ slug: posts.slug, title: posts.title, publishedAt: posts.publishedAt })
+	.select({ slug: posts.slug, title: posts.title, publishedAt: posts.publishedAt, contentMd: posts.contentMd })
 	.from(posts)
 	.where(eq(posts.isPublished, true))
 	.orderBy(desc(posts.publishedAt))
 	.limit(5);
+
+const excerpt = (md: string) =>
+	md
+		.replace(/^#+\s+.*$/gm, '')
+		.replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+		.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+		.replace(/[#*_`>]/g, '')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, 180);
+
+const [featured, ...rest] = recent;
 ---
 
 <!doctype html>
@@ -34,49 +46,146 @@ const recent = await db
 		<Header />
 		<main>
 			<section class="hero">
+				<span class="eyebrow">{t('index.eyebrow')}</span>
 				<h1>{clientName}</h1>
-				<p>{tagline}</p>
+				<div class="ornament" aria-hidden="true">✦</div>
+				<p class="tagline">{tagline}</p>
 			</section>
-			{recent.length > 0 && (
-				<section>
-					<h2>{t('index.latestPosts')}</h2>
-					<ul class="post-list">
-						{recent.map((p) => (
-							<li>
-								<a href={`/blog/${p.slug}`}>
-									<span class="title">{p.title}</span>
-									{p.publishedAt && (
-										<span class="date"><FormattedDate date={p.publishedAt} lang={lang} /></span>
-									)}
-								</a>
-							</li>
-						))}
-					</ul>
-					<p><a href="/blog">{t('index.allPosts')}</a></p>
-				</section>
-			)}
 		</main>
+		{featured && (
+			<section class="latest pocket" aria-labelledby="latest-heading">
+				<span class="pocket-label deboss" aria-hidden="true">{t('index.latestLabel')}</span>
+				<h2 id="latest-heading" class="sr-only">{t('index.latestPosts')}</h2>
+				<div class="stack">
+					<a href={`/blog/${featured.slug}`} class="post-card featured card lift">
+						<span class="micro bracket badge">{t('index.featured')}</span>
+						<span class="title">{featured.title}</span>
+						{excerpt(featured.contentMd) && <span class="excerpt">{excerpt(featured.contentMd)}…</span>}
+						{featured.publishedAt && (
+							<span class="micro date"><FormattedDate date={featured.publishedAt} lang={lang} /></span>
+						)}
+					</a>
+					{rest.length > 0 && (
+						<ul class="post-grid">
+							{rest.map((p) => (
+								<li>
+									<a href={`/blog/${p.slug}`} class="post-card card lift">
+										{p.publishedAt && (
+											<span class="micro date"><FormattedDate date={p.publishedAt} lang={lang} /></span>
+										)}
+										<span class="title">{p.title}</span>
+									</a>
+								</li>
+							))}
+						</ul>
+					)}
+					<p class="all"><a href="/blog" class="btn">{t('index.allPosts')}</a></p>
+				</div>
+			</section>
+		)}
 		<Footer />
 	</body>
 </html>
 
 <style>
-	.hero { text-align: center; padding: 3em 0 1em; }
-	.hero h1 { font-size: 3em; margin-bottom: 0.2em; }
-	.hero p { color: rgb(var(--gray)); font-size: 1.1em; }
-	.post-list { list-style: none; padding: 0; margin: 0; }
-	.post-list li { border-bottom: 1px solid rgb(var(--gray-light)); }
-	.post-list li:last-child { border-bottom: none; }
-	.post-list a {
-		display: flex;
-		justify-content: space-between;
-		align-items: baseline;
-		gap: 1em;
-		padding: 0.9em 0;
-		text-decoration: none;
-		color: rgb(var(--gray-dark));
+	.hero {
+		text-align: center;
+		padding: 3.5em 0 1.5em;
 	}
-	.post-list a:hover .title { color: var(--accent); }
-	.post-list .title { font-weight: 600; }
-	.post-list .date { color: rgb(var(--gray)); font-size: 0.9em; flex-shrink: 0; }
+	.hero h1 {
+		font-size: clamp(3.2rem, 9vw, 6.5rem);
+		margin: 0;
+	}
+	.tagline {
+		max-width: 34em;
+		margin: 0 auto;
+		font-style: italic;
+		font-size: 1.15em;
+		color: var(--muted);
+	}
+
+	.latest {
+		padding: 6rem 1.25rem 3.5rem;
+	}
+	.pocket-label {
+		position: absolute;
+		top: 3rem;
+		left: 0;
+		right: 0;
+		text-align: center;
+		font-family: var(--font-display-stack);
+		font-style: italic;
+		font-size: clamp(4rem, 14vw, 11rem);
+		line-height: 1;
+		letter-spacing: -0.03em;
+		pointer-events: none;
+		user-select: none;
+	}
+	.stack {
+		position: relative;
+		z-index: 1;
+		max-width: 880px;
+		margin: 0 auto;
+	}
+	.post-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 1.6rem 1.75rem;
+		color: var(--text);
+		text-decoration: none;
+		height: 100%;
+		box-sizing: border-box;
+	}
+	.post-card:hover { color: var(--text); }
+	.post-card .title {
+		font-family: var(--font-display-stack);
+		font-size: 1.65rem;
+		line-height: 1.08;
+		letter-spacing: -0.02em;
+		color: var(--ink);
+		transition: color 0.2s;
+	}
+	.post-card:hover .title { color: var(--accent); }
+	.post-card .date { color: var(--muted); }
+
+	.featured {
+		align-items: center;
+		text-align: center;
+		padding: 2.75rem 2.5rem 2.25rem;
+		margin-top: 5.5rem;
+	}
+	.featured .badge { color: var(--accent); }
+	.featured .title { font-size: clamp(2rem, 5vw, 3rem); max-width: 18em; }
+	.featured .excerpt {
+		max-width: 36em;
+		font-style: italic;
+		color: var(--muted);
+		font-size: 1rem;
+		line-height: 1.6;
+	}
+
+	.post-grid {
+		list-style: none;
+		padding: 0;
+		margin: 1.25rem 0 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 1.25rem;
+	}
+	.all {
+		text-align: center;
+		margin: 2.5rem 0 0;
+	}
+	.all .btn {
+		background: var(--card);
+		color: var(--ink);
+		border-color: var(--card);
+	}
+	.all .btn:hover { background: var(--ink); color: var(--card); border-color: var(--ink); }
+
+	@media (max-width: 640px) {
+		.latest { padding: 5rem 1rem 2.5rem; }
+		.featured { margin-top: 3.5rem; padding: 2rem 1.25rem 1.75rem; }
+	}
 </style>

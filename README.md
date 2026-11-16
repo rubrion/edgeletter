@@ -120,7 +120,7 @@ Only **infrastructure** and **build-time** vars live here. Brand visuals are man
 "vars": {
   "CLIENT_DOMAIN": "<tenant>.example.com",
   "CLIENT_SLUG": "<tenant>",
-  "CLIENT_FONT": "Inter",
+  "CLIENT_FONT": "",
   "MEDIA_PUBLIC_BASE": "https://media.example.com",
   "EMAIL_PROVIDER": "RESEND"
 },
@@ -212,7 +212,7 @@ Resolution at request time: **DB row → `wrangler.jsonc` seed → hard-coded de
 | --- | ------------- | ------- |
 | `CLIENT_DOMAIN` | always | Canonical URLs, sitemap, default Resend `from` (`noreply@$CLIENT_DOMAIN`), Astro `site` URL |
 | `CLIENT_SLUG` | always (R2 uploads) | Folder name under `edgeletter/` in the media bucket. Keeps tenant uploads isolated |
-| `CLIENT_FONT` | optional | Google Font family name (e.g. `Inter`, `Playfair Display`). Read at **build time** |
+| `CLIENT_FONT` | optional | Google Font family for **body text** (default `Newsreader`; headings stay Instrument Serif, eyebrows Pinyon Script). Read at **build time** |
 | `MEDIA_PUBLIC_BASE` | always (R2 uploads) | Public base URL of the R2 bucket (e.g. `https://media.example.com`). Used to build asset URLs after upload |
 | `EMAIL_PROVIDER` | always | `RESEND` or `GMAIL` |
 

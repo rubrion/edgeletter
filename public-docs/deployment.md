@@ -46,7 +46,7 @@ One bucket can be shared across all tenants — uploads land under `edgeletter/<
 "vars": {
   "CLIENT_DOMAIN": "<tenant>.example.com",
   "CLIENT_SLUG": "<tenant>",
-  "CLIENT_FONT": "Inter",
+  "CLIENT_FONT": "",
   "MEDIA_PUBLIC_BASE": "https://media.example.com",
   "EMAIL_PROVIDER": "RESEND"
 },

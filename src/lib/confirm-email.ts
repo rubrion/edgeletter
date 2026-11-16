@@ -35,15 +35,18 @@ const buildBody = ({
   clientName,
   confirmUrl,
   themeColor,
+  clientDomain = '',
   lang = 'en',
 }: {
   clientName: string;
   confirmUrl: string;
   themeColor: string;
+  clientDomain?: string;
   lang?: 'en' | 'pt';
 }) => {
   const w = WORDS[lang];
   const deep = deepen(themeColor);
+  const logoUrl = clientDomain ? `https://${clientDomain}/logo.png` : '';
   const E = EMAIL;
   const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 ${E.fontsLink}</head>
@@ -52,7 +55,7 @@ ${E.fontsLink}</head>
   <tr><td align="center" style="padding:40px 12px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
       <tr><td align="center" style="background:${themeColor};padding:24px 24px 20px;">
-        <p style="margin:0;${microStyle(deep)}font-size:12px;font-weight:600;text-shadow:0 1px 0 rgba(255,255,255,0.14);">[&nbsp;${escapeHtml(clientName)}&nbsp;]</p>
+        ${logoUrl ? `<img src="${logoUrl}" width="36" height="36" alt="" style="display:block;margin:0 auto 10px;border:0;">` : ''}<p style="margin:0;${microStyle(deep)}font-size:12px;font-weight:600;text-shadow:0 1px 0 rgba(255,255,255,0.14);">[&nbsp;${escapeHtml(clientName)}&nbsp;]</p>
       </td></tr>
       <tr><td align="center" style="background:${E.card};border:1px solid ${E.hairline};border-top:0;padding:40px 40px 34px;">
         <h1 style="margin:0 0 16px;font-family:${E.display};font-weight:400;font-size:36px;line-height:1.05;letter-spacing:-0.02em;color:${E.ink};">${w.title}</h1>
@@ -104,6 +107,7 @@ export const sendConfirmationEmail = async ({
     clientName: settings.clientName,
     confirmUrl,
     themeColor: settings.themePrimaryColor,
+    clientDomain: e.CLIENT_DOMAIN ?? '',
     lang,
   });
 

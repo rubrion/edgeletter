@@ -11,7 +11,7 @@ import { platformOrigin, publicationById, publicationOrigin, resolveHost, Tenant
  *                 publication-scoped /admin/* pages and /api/* endpoints for
  *                 the signed-in user's active publication
  *   publication → the public site; /admin redirects to the app; writes need an API key
- *   alias       → old address: 301 to the publication, except email links
+ *   alias       → old address: 301 to the publication; /api/* answered in place
  *   unknown     → 404
  *
  * Auth decisions are made on a normalized path (decoded, dot segments
@@ -60,8 +60,12 @@ const isPublicAppPath = (path: string): boolean => path === '/signin' || under(p
 const needsPublicationInApp = (path: string): boolean =>
   ['/members', '/keys', '/billing', '/domain'].some((p) => under(path, p));
 
-/** Email links in already-sent messages that must keep working on an old host. */
-const ALIAS_IN_PLACE = ['/api/unsubscribe', '/api/subscribe/confirm'];
+/**
+ * On an old host, links in already-sent emails and API calls from existing
+ * integrations (a site posting subscribers or syncing posts) are answered in
+ * place: POSTs don't follow redirects. Everything else 301s to the publication.
+ */
+const aliasInPlace = (path: string): boolean => under(path, '/api');
 
 const rewriteInto = (prefix: string, url: URL): string =>
   `${prefix}${url.pathname === '/' ? '' : url.pathname}${url.search}`;
@@ -92,15 +96,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
       if (under(path, '/admin') || under(path, '/api')) return page(404, 'Not found', 'There is nothing here.');
       return next(rewriteInto('/x-platform', url));
 
-    case 'alias': {
-      locals.publication = target.publication;
-      if (ALIAS_IN_PLACE.includes(path)) return next();
-      return redirect(`${publicationOrigin(url, target.publication)}${url.pathname}${url.search}`, 301);
-    }
-
+    case 'alias':
     case 'publication': {
       const publication = target.publication;
       locals.publication = publication;
+      if (target.kind === 'alias' && !aliasInPlace(path)) {
+        return redirect(`${publicationOrigin(url, publication)}${url.pathname}${url.search}`, 301);
+      }
       if (!isAdminSurface(path)) {
         if (publication.status === 'suspended') {
           return page(451, 'Publication unavailable', 'This publication has been suspended.');

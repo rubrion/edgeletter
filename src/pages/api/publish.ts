@@ -1,9 +1,10 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import { marked } from 'marked';
 import { audienceFor, CampaignAlreadyLive, enqueueCampaign, liveCampaignFor, retireStaleCampaigns } from '../../lib/email-queue';
 import { limitsFor, reserveEmails } from '../../lib/plans';
+import { postMeta } from '../../lib/post-meta';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { pubId } from '../../lib/tenant';
 import { getDbInstance, campaigns, posts, type Post } from '../../db';
@@ -71,11 +72,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .limit(1);
     if (!existing) return Response.json({ error: 'post not found' }, { status: 404 });
   } else {
-    // No id: a sync matches the post by its slug, so running it again updates instead of duplicating.
+    // No id: a sync matches the post by its slug, or by its canonical URL (it
+    // may already exist from a feed import), so re-running updates instead of duplicating.
     [existing] = await db
       .select()
       .from(posts)
-      .where(and(eq(posts.slug, slug), eq(posts.publicationId, publicationId)))
+      .where(
+        and(
+          eq(posts.publicationId, publicationId),
+          canonicalUrl ? or(eq(posts.slug, slug), eq(posts.canonicalUrl, canonicalUrl)) : eq(posts.slug, slug),
+        ),
+      )
       .limit(1);
   }
 
@@ -100,6 +107,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         contentHtml,
         lang,
         canonicalUrl,
+        ...postMeta(contentHtml),
         ...(stamped ? { publishedAt: stamped } : {}),
         ...(transitioningToPublished
           ? { isPublished: true, publishedAt: stamped ?? new Date() }
@@ -121,6 +129,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         contentHtml,
         lang,
         canonicalUrl,
+        ...postMeta(contentHtml),
         isPublished: body.publish,
         publishedAt: body.publish ? (stamped ?? new Date()) : null,
       })

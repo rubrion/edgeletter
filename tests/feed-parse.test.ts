@@ -34,3 +34,13 @@ test('Atom with alternate link and html content', () => {
 test('rejects non-feeds', () => {
   expect(() => parseFeed('<html><body>nope</body></html>')).toThrow();
 });
+
+test('cover image from enclosure / media', () => {
+  const xml = `<rss xmlns:media="http://search.yahoo.com/mrss/"><channel><title>t</title>
+    <item><title>a</title><link>https://x/a</link><enclosure url="https://x/a.webp" type="image/webp" length="1"/></item>
+    <item><title>b</title><link>https://x/b</link><media:content url="https://x/b.jpg" medium="image"/></item>
+    <item><title>c</title><link>https://x/c</link><media:thumbnail url="https://x/c.png"/></item>
+    <item><title>d</title><link>https://x/d</link><enclosure url="https://x/d.mp3" type="audio/mpeg"/></item>
+  </channel></rss>`;
+  expect(parseFeed(xml).items.map((i) => i.image)).toEqual(['https://x/a.webp', 'https://x/b.jpg', 'https://x/c.png', null]);
+});

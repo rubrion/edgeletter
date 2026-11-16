@@ -36,6 +36,8 @@ const translations = {
 
     'blog.title': 'Blog',
     'blog.empty': 'No posts yet.',
+    'blog.read': 'Read →',
+    'blog.latest': 'Latest',
 
     'about.title': 'About',
     'about.body': '{name} is a newsletter and blog. Subscribe to receive new posts in your inbox.',
@@ -75,6 +77,8 @@ const translations = {
 
     'blog.title': 'Blog',
     'blog.empty': 'Nenhuma publicação ainda.',
+    'blog.read': 'Ler →',
+    'blog.latest': 'Mais recente',
 
     'about.title': 'Sobre',
     'about.body': '{name} é uma newsletter e blog. Assine para receber novas publicações na sua caixa de entrada.',

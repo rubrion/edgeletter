@@ -4,6 +4,7 @@ import { sha256 } from './auth';
 import { audienceFor, enqueueCampaign } from './email-queue';
 import { parseFeed, type FeedItem } from './feed-parse';
 import { limitsFor, reserveEmails } from './plans';
+import { postMeta } from './post-meta';
 import { sanitizeHtml } from './sanitize';
 
 /**
@@ -169,6 +170,21 @@ export const importFeed = async (env: Env, source: FeedSource, backfill = false)
       .returning({ h: feedItems.guidHash });
     if (claimed.length === 0) continue;
 
+    // Already published here (e.g. by the site's own sync script)? Link the
+    // feed item to that post instead of creating a duplicate, and never email it.
+    const canonicalUrl = httpsOrNull(item.link);
+    if (canonicalUrl) {
+      const [existing] = await db
+        .select({ id: posts.id })
+        .from(posts)
+        .where(and(eq(posts.publicationId, source.publicationId), eq(posts.canonicalUrl, canonicalUrl)))
+        .limit(1);
+      if (existing) {
+        await db.update(feedItems).set({ postId: existing.id }).where(and(eq(feedItems.feedId, source.id), eq(feedItems.guidHash, item.hash)));
+        continue;
+      }
+    }
+
     const html = sanitizeHtml(item.html || '');
     const title = (item.title || 'Untitled').slice(0, 300);
     const [post] = await db
@@ -183,7 +199,8 @@ export const importFeed = async (env: Env, source: FeedSource, backfill = false)
         isPublished: true,
         publishedAt: item.date ?? now,
         lang: source.lang,
-        canonicalUrl: httpsOrNull(item.link),
+        canonicalUrl,
+        ...postMeta(html, item.image),
       })
       .returning();
     await db.update(feedItems).set({ postId: post!.id }).where(and(eq(feedItems.feedId, source.id), eq(feedItems.guidHash, item.hash)));

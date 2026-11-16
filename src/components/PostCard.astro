@@ -1,0 +1,125 @@
+---
+import FormattedDate from './FormattedDate.astro';
+import { useTranslations, type Lang } from '../i18n';
+
+export interface CardPost {
+	slug: string;
+	title: string;
+	publishedAt: Date | null;
+	coverUrl: string | null;
+	excerpt: string | null;
+}
+
+interface Props {
+	post: CardPost;
+	lang: Lang;
+	/** 'feature': wide, image beside the text. 'card': image on top. */
+	variant?: 'feature' | 'card';
+	/** Stagger index for the reveal animation. */
+	i?: number;
+	badge?: string;
+}
+
+const { post, lang, variant = 'card', i = 0, badge } = Astro.props;
+// No cover: a stationery tile with the title's first letter.
+const initial = (post.title.trim()[0] ?? '✦').toUpperCase();
+const t = useTranslations(lang);
+---
+
+<a href={`/blog/${post.slug}`} class:list={['post-card', 'card', 'lift', 'reveal', 'from-pocket', variant]} style={`--i: ${i}`}>
+	<div class="thumb">
+		{post.coverUrl ? (
+			<img src={post.coverUrl} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+		) : (
+			<span class="initial" aria-hidden="true">{initial}</span>
+		)}
+	</div>
+	<div class="body">
+		{badge && <span class="micro bracket badge">{badge}</span>}
+		{post.publishedAt && <span class="micro date"><FormattedDate date={post.publishedAt} lang={lang} /></span>}
+		<span class="title">{post.title}</span>
+		{post.excerpt && <span class="excerpt">{post.excerpt}</span>}
+		<span class="micro more">{t('blog.read')}</span>
+	</div>
+</a>
+
+<style>
+	.post-card {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		box-sizing: border-box;
+		overflow: hidden;
+		color: var(--text);
+		text-decoration: none;
+	}
+	.post-card:hover { color: var(--text); }
+	.thumb {
+		position: relative;
+		aspect-ratio: 16 / 10;
+		overflow: hidden;
+		background: color-mix(in srgb, var(--accent) 12%, var(--card));
+		border-bottom: var(--hairline);
+	}
+	.thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+		border-radius: 0;
+		box-shadow: none;
+		transition: transform 0.6s var(--ease-paper, ease);
+	}
+	.post-card:hover .thumb img { transform: scale(1.035); }
+	.initial {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		font-family: var(--font-display-stack);
+		font-style: italic;
+		font-weight: 500;
+		font-size: 5rem;
+		color: color-mix(in srgb, var(--accent) 70%, var(--card));
+	}
+	.body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+		padding: 1.4rem 1.5rem 1.5rem;
+		flex: 1;
+	}
+	.badge { color: var(--accent); }
+	.date { color: var(--muted); }
+	.title {
+		font-family: var(--font-display-stack);
+		font-weight: var(--display-weight);
+		letter-spacing: var(--display-tracking);
+		word-spacing: var(--display-words);
+		font-size: 1.5rem;
+		line-height: 1.15;
+		color: var(--ink);
+		transition: color 0.2s;
+	}
+	.post-card:hover .title { color: var(--accent); }
+	.excerpt {
+		font-size: 0.95rem;
+		line-height: 1.6;
+		color: var(--muted);
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+	.more { margin-top: auto; padding-top: 0.4rem; color: var(--accent); }
+
+	/* Wide feature: image beside the text on larger screens. */
+	.feature { display: grid; grid-template-columns: 1fr; }
+	.feature .title { font-size: clamp(1.8rem, 4vw, 2.6rem); }
+	.feature .excerpt { -webkit-line-clamp: 4; font-size: 1rem; }
+	@media (min-width: 760px) {
+		.feature { grid-template-columns: 1.15fr 1fr; }
+		.feature .thumb { aspect-ratio: auto; min-height: 100%; border-bottom: 0; border-right: var(--hairline); }
+		.feature .body { padding: 2.25rem 2.25rem 2rem; justify-content: center; }
+	}
+</style>

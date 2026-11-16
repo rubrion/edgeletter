@@ -13,6 +13,8 @@ export type FeedItem = {
   link: string | null;
   date: Date | null;
   html: string;
+  /** Cover image from enclosure / media:content / media:thumbnail, if any. */
+  image: string | null;
 };
 
 export type ParsedFeed = { title: string; items: FeedItem[] };
@@ -25,7 +27,7 @@ const parser = new XMLParser({
   processEntities: true,
   htmlEntities: true,
   trimValues: true,
-  isArray: (name) => ['item', 'entry', 'link'].includes(name),
+  isArray: (name) => ['item', 'entry', 'link', 'enclosure', 'media:content', 'media:thumbnail'].includes(name),
 });
 
 /** Text of a node that may be a string, a number, or { '#text': … }. */
@@ -60,6 +62,17 @@ const rssLink = (links: unknown): string | null => {
   return null;
 };
 
+/** First image URL among enclosures and Media RSS elements. */
+const mediaImage = (it: Record<string, unknown>): string | null => {
+  const list = (v: unknown) => (Array.isArray(v) ? v : v ? [v] : []) as Record<string, string>[];
+  for (const e of list(it.enclosure)) if (e['@_url'] && /^image\//.test(e['@_type'] ?? '')) return e['@_url'];
+  for (const m of list(it['media:content']))
+    if (m['@_url'] && (m['@_medium'] === 'image' || /^image\//.test(m['@_type'] ?? ''))) return m['@_url'];
+  for (const t of list(it['media:thumbnail'])) if (t['@_url']) return t['@_url'];
+  const group = it['media:group'] as Record<string, unknown> | undefined;
+  return group ? mediaImage(group) : null;
+};
+
 export const parseFeed = (xml: string): ParsedFeed => {
   const doc = parser.parse(xml) as Record<string, any>;
 
@@ -77,6 +90,7 @@ export const parseFeed = (xml: string): ParsedFeed => {
           link,
           date: date(it.pubDate) ?? date(it['dc:date']),
           html: text(it['content:encoded']) || text(it.description),
+          image: mediaImage(it),
         };
       }),
     };
@@ -95,6 +109,7 @@ export const parseFeed = (xml: string): ParsedFeed => {
           link,
           date: date(e.published) ?? date(e.updated),
           html: text(e.content) || text(e.summary),
+          image: mediaImage(e),
         };
       }),
     };
@@ -114,6 +129,7 @@ export const parseFeed = (xml: string): ParsedFeed => {
           link,
           date: date(it['dc:date']),
           html: text(it['content:encoded']) || text(it.description),
+          image: mediaImage(it),
         };
       }),
     };

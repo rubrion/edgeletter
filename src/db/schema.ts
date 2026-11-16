@@ -85,8 +85,13 @@ export const posts = sqliteTable(
     lang: text('lang', { enum: ['en', 'pt'] }).notNull().default('en'),
     /** Where the post really lives when it's synced from another site; emails and the page link there. */
     canonicalUrl: text('canonical_url'),
+    /** Card image: first image of the post or the feed item's media. */
+    coverUrl: text('cover_url'),
+    /** Plain-text summary for lists and social previews. */
+    excerpt: text('excerpt'),
   },
   (t) => ({
+    posts_publication_canonical_idx: index('posts_publication_canonical_idx').on(t.publicationId, t.canonicalUrl),
     posts_publication_slug_unique: uniqueIndex('posts_publication_slug_unique').on(t.publicationId, t.slug),
     posts_publication_published_idx: index('posts_publication_published_idx').on(t.publicationId, t.isPublished, t.publishedAt),
   }),

@@ -1,150 +1,133 @@
-import type { Post, Subscriber } from '../db';
+import type { Post } from '../db';
 import { sendBatchGmail } from './smtp';
 import { wrapPostInEmail } from './email-template';
-import { loadSettings, type Settings } from './settings';
+import { sanitizeHtml } from './sanitize';
+import type { Settings } from './settings';
 
-type DispatchArgs = {
-  env: Env;
-  post: Pick<Post, 'title' | 'slug' | 'contentHtml' | 'lang' | 'canonicalUrl'>;
-  subscribers: Pick<Subscriber, 'id' | 'email'>[];
-};
+export type Provider = 'RESEND' | 'GMAIL';
 
-export type DispatchResult = {
-  provider: 'RESEND' | 'GMAIL';
-  sent: number;
-  failed: number;
-  status: 'sent' | 'partial' | 'failed';
-};
+export type Recipient = { id: string; email: string };
 
-export const dispatchCampaign = async ({
-  env,
-  post,
-  subscribers,
-}: DispatchArgs): Promise<DispatchResult> => {
-  const provider = (env.EMAIL_PROVIDER as string) === 'GMAIL' ? 'GMAIL' : 'RESEND';
-  if (subscribers.length === 0) {
-    return { provider, sent: 0, failed: 0, status: 'sent' };
-  }
+/** Per-recipient outcome of one batch: retry `transient`, give up on `permanent`. */
+export type BatchOutcome = { sent: string[]; transient: string[]; permanent: string[] };
 
-  const settings = await loadSettings();
-
-  const totals =
-    provider === 'RESEND'
-      ? await sendViaResend({ env, settings, post, subscribers })
-      : await sendViaGmail({ env, settings, post, subscribers });
-
-  const status: DispatchResult['status'] =
-    totals.failed === 0 ? 'sent' : totals.sent === 0 ? 'failed' : 'partial';
-  return { provider, ...totals, status };
-};
-
-const sendViaResend = async ({
-  env,
-  settings,
-  post,
-  subscribers,
-}: {
+type SendArgs = {
   env: Env;
   settings: Settings;
+  /** Public hostname of the publication (links, unsubscribe). */
+  host: string;
   post: Pick<Post, 'title' | 'slug' | 'contentHtml' | 'lang' | 'canonicalUrl'>;
-  subscribers: Pick<Subscriber, 'id' | 'email'>[];
-}): Promise<{ sent: number; failed: number }> => {
-  const e = env as unknown as { RESEND_API_KEY?: string };
-  if (!e.RESEND_API_KEY) throw new Error('RESEND_API_KEY not set');
+  recipients: Recipient[];
+};
 
-  const clientDomain = env.CLIENT_DOMAIN as string;
-  const fromDomain = (env as unknown as { EMAIL_FROM_DOMAIN?: string }).EMAIL_FROM_DOMAIN || clientDomain;
+/** Resend's batch endpoint takes at most 100 emails per call. */
+export const MAX_BATCH = 100;
+
+export const providerFor = (env: Env): Provider =>
+  (env.EMAIL_PROVIDER as string) === 'GMAIL' ? 'GMAIL' : 'RESEND';
+
+const render = ({ settings, host, post }: Omit<SendArgs, 'env' | 'recipients'>, r: Recipient) => {
+  const unsubscribeUrl = `https://${host}/api/unsubscribe?id=${r.id}`;
+  const { html, text } = wrapPostInEmail({
+    clientName: settings.clientName,
+    clientDomain: host,
+    themeColor: settings.themePrimaryColor,
+    postTitle: post.title,
+    postUrl: post.canonicalUrl ?? `https://${host}/blog/${post.slug}`,
+    postHtml: sanitizeHtml(post.contentHtml),
+    lang: post.lang,
+    unsubscribeUrl,
+  });
+  return { html, text, unsubscribeUrl };
+};
+
+/** Send one batch (≤ MAX_BATCH) and classify every recipient. Never throws. */
+export const sendBatch = async (args: SendArgs): Promise<BatchOutcome> => {
+  if (args.recipients.length === 0) return { sent: [], transient: [], permanent: [] };
+  return providerFor(args.env) === 'RESEND' ? sendViaResend(args) : sendViaGmail(args);
+};
+
+const sendViaResend = async (args: SendArgs): Promise<BatchOutcome> => {
+  const { env, settings, host, post, recipients } = args;
+  const ids = recipients.map((r) => r.id);
+  const e = env as unknown as { RESEND_API_KEY?: string; EMAIL_FROM_DOMAIN?: string };
+  if (!e.RESEND_API_KEY) return { sent: [], transient: [], permanent: ids };
+
+  const fromDomain = e.EMAIL_FROM_DOMAIN || host;
   const local = settings.emailFromLocal.trim() || 'noreply';
-  const fromAddress = `${local}@${fromDomain}`;
-  const from = `${settings.clientName} <${fromAddress}>`;
+  const from = `${settings.clientName} <${local}@${fromDomain}>`;
 
-  const results = await Promise.allSettled(
-    subscribers.map(({ id, email }) => {
-      const unsubscribeUrl = `https://${clientDomain}/api/unsubscribe?id=${id}`;
-      const { html, text } = wrapPostInEmail({
-        clientName: settings.clientName,
-        clientDomain,
-        themeColor: settings.themePrimaryColor,
-        postTitle: post.title,
-        postUrl: post.canonicalUrl ?? `https://${clientDomain}/blog/${post.slug}`,
-        postHtml: post.contentHtml,
-        lang: post.lang,
-        unsubscribeUrl,
-      });
-
-      return fetch('https://api.resend.com/emails', {
-        method: 'POST',
+  let payload;
+  try {
+    const payload = recipients.map((r) => {
+      const { html, text, unsubscribeUrl } = render(args, r);
+      return {
+        from,
+        to: r.email,
+        subject: post.title,
+        html,
+        text,
         headers: {
-          Authorization: `Bearer ${e.RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         },
-        body: JSON.stringify({
-          from,
-          to: email,
-          subject: post.title,
-          html,
-          text,
-          headers: {
-            'List-Unsubscribe': `<${unsubscribeUrl}>`,
-            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-          },
-        }),
-      }).then(async (res) => {
-        if (!res.ok) throw new Error(`resend ${res.status}: ${await res.text()}`);
-      });
-    }),
-  );
+      };
+    });
+  } catch (err) {
+    // Rendering is deterministic: retrying won't help.
+    console.error('email render failed', err);
+    return { sent: [], transient: [], permanent: ids };
+  }
 
-  const failed = results.filter((r) => r.status === 'rejected').length;
-  return { sent: subscribers.length - failed, failed };
+  try {
+    const res = await fetch('https://api.resend.com/emails/batch', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${e.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) return { sent: ids, transient: [], permanent: [] };
+    // Rate limits and provider outages are worth retrying; validation errors are not.
+    if (res.status === 429 || res.status >= 500) return { sent: [], transient: ids, permanent: [] };
+    console.error('resend batch rejected', res.status, await res.text());
+    return { sent: [], transient: [], permanent: ids };
+  } catch (err) {
+    console.error('resend batch network error', err);
+    return { sent: [], transient: ids, permanent: [] };
+  }
 };
 
-const sendViaGmail = async ({
-  env,
-  settings,
-  post,
-  subscribers,
-}: {
-  env: Env;
-  settings: Settings;
-  post: Pick<Post, 'title' | 'slug' | 'contentHtml' | 'lang' | 'canonicalUrl'>;
-  subscribers: Pick<Subscriber, 'id' | 'email'>[];
-}): Promise<{ sent: number; failed: number }> => {
+const sendViaGmail = async (args: SendArgs): Promise<BatchOutcome> => {
+  const { env, settings, recipients, post } = args;
   const e = env as unknown as { GMAIL_USER?: string; GMAIL_APP_PASSWORD?: string };
+  const out: BatchOutcome = { sent: [], transient: [], permanent: [] };
   if (!e.GMAIL_USER || !e.GMAIL_APP_PASSWORD) {
-    throw new Error('GMAIL_USER or GMAIL_APP_PASSWORD not set');
+    out.permanent = recipients.map((r) => r.id);
+    return out;
   }
-  const clientDomain = env.CLIENT_DOMAIN as string;
-
-  // Gmail: send individually so each recipient gets their own unsubscribe URL
-  let sent = 0;
-  let failed = 0;
-  for (const { id, email } of subscribers) {
-    const unsubscribeUrl = `https://${clientDomain}/api/unsubscribe?id=${id}`;
-    const { html } = wrapPostInEmail({
-      clientName: settings.clientName,
-      clientDomain,
-      themeColor: settings.themePrimaryColor,
-      postTitle: post.title,
-      postUrl: post.canonicalUrl ?? `https://${clientDomain}/blog/${post.slug}`,
-      postHtml: post.contentHtml,
-      lang: post.lang,
-      unsubscribeUrl,
-    });
+  // One message per recipient so each gets its own unsubscribe URL.
+  for (const r of recipients) {
+    let html: string;
     try {
-      await sendBatchGmail({
+      ({ html } = render(args, r));
+    } catch (err) {
+      console.error('email render failed', err);
+      out.permanent.push(r.id);
+      continue;
+    }
+    try {
+      const res = await sendBatchGmail({
         user: e.GMAIL_USER,
         pass: e.GMAIL_APP_PASSWORD,
         fromAddress: e.GMAIL_USER,
         fromName: settings.clientName,
-        recipients: [email],
+        recipients: [r.email],
         subject: post.title,
         html,
       });
-      sent++;
+      (res.sent > 0 ? out.sent : out.transient).push(r.id);
     } catch {
-      failed++;
+      out.transient.push(r.id);
     }
   }
-  return { sent, failed };
+  return out;
 };

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
+import { sanitizeHtml } from '../lib/sanitize';
 
 type UploadResult = { url: string; key: string; kind: 'image' | 'video'; size: number };
 
@@ -153,7 +154,7 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
 
   const previewHtml = useMemo(() => {
     if (!draft.contentMd) return '';
-    return marked.parse(draft.contentMd, { async: false }) as string;
+    return sanitizeHtml(marked.parse(draft.contentMd, { async: false }) as string);
   }, [draft.contentMd]);
 
   const isExisting = !!draft.id;
@@ -208,7 +209,7 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
           publishedAt: string | null;
         };
         campaign?: { sentAt: string; status: string } | null;
-        dispatch?: { sent: number; failed: number } | null;
+        dispatch?: { recipients: number; queued: boolean; sent: number; failed: number } | null;
         alreadySent?: boolean;
         error?: string;
       };
@@ -243,8 +244,12 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
       if (json.alreadySent) {
         setMessage('Updated. Email was already delivered earlier — not re-sending.');
       } else if (json.dispatch) {
+        const d = json.dispatch;
+        const plural = (n: number) => `${n} subscriber${n === 1 ? '' : 's'}`;
         setMessage(
-          `Sent to ${json.dispatch.sent} subscriber${json.dispatch.sent === 1 ? '' : 's'}, ${json.dispatch.failed} failed.`,
+          d.queued
+            ? `Queued for ${plural(d.recipients)} — sending in the background.`
+            : `Sent to ${plural(d.sent)}${d.failed ? `, ${d.failed} failed` : ''}.`,
         );
       } else if (publish) {
         setMessage('Published.');

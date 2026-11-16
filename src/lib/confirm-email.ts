@@ -5,6 +5,8 @@ import type { Settings } from './settings';
 type SendConfirmArgs = {
   env: unknown;
   settings: Settings;
+  /** Public hostname of the publication. */
+  host: string;
   to: string;
   confirmUrl: string;
   lang?: 'en' | 'pt';
@@ -89,6 +91,7 @@ const escapeHtml = (s: string) =>
 export const sendConfirmationEmail = async ({
   env,
   settings,
+  host,
   to,
   confirmUrl,
   lang = 'en',
@@ -107,13 +110,13 @@ export const sendConfirmationEmail = async ({
     clientName: settings.clientName,
     confirmUrl,
     themeColor: settings.themePrimaryColor,
-    clientDomain: e.CLIENT_DOMAIN ?? '',
+    clientDomain: host,
     lang,
   });
 
   if (provider === 'RESEND') {
     if (!e.RESEND_API_KEY) throw new Error('RESEND_API_KEY not set');
-    const fromDomain = e.EMAIL_FROM_DOMAIN || e.CLIENT_DOMAIN || '';
+    const fromDomain = e.EMAIL_FROM_DOMAIN || host;
     const local = settings.emailFromLocal.trim() || 'noreply';
     const fromAddress = `${local}@${fromDomain}`;
     const from = `${settings.clientName} <${fromAddress}>`;

@@ -6,12 +6,12 @@ import Header from '../components/Header.astro';
 import { getLang, useTranslations } from '../i18n';
 import { loadSettings } from '../lib/settings';
 import { getDbInstance, posts } from '../db';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 const lang = getLang(Astro.request);
 const t = useTranslations(lang);
 
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const clientName = settings.clientName;
 const description = `Latest from ${clientName}.`;
 const tagline = settings.clientTagline || 'Notes, essays, and announcements — straight to your inbox.';
@@ -20,7 +20,7 @@ const db = getDbInstance();
 const recent = await db
 	.select({ slug: posts.slug, title: posts.title, publishedAt: posts.publishedAt, contentMd: posts.contentMd })
 	.from(posts)
-	.where(eq(posts.isPublished, true))
+	.where(and(eq(posts.publicationId, Astro.locals.publication.id), eq(posts.isPublished, true)))
 	.orderBy(desc(posts.publishedAt))
 	.limit(5);
 

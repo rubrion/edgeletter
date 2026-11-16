@@ -2,6 +2,7 @@
 import BlogPost from '../../layouts/BlogPost.astro';
 import { getDbInstance, posts } from '../../db';
 import { and, eq } from 'drizzle-orm';
+import { sanitizeHtml } from '../../lib/sanitize';
 
 const { slug } = Astro.params;
 if (!slug) {
@@ -12,7 +13,7 @@ const db = getDbInstance();
 const [post] = await db
 	.select()
 	.from(posts)
-	.where(and(eq(posts.slug, slug), eq(posts.isPublished, true)))
+	.where(and(eq(posts.publicationId, Astro.locals.publication.id), eq(posts.slug, slug), eq(posts.isPublished, true)))
 	.limit(1);
 
 if (!post) {
@@ -28,5 +29,5 @@ const description = post.contentMd
 ---
 
 <BlogPost title={post.title} description={description} pubDate={post.publishedAt} canonical={post.canonicalUrl ?? undefined} lang={post.lang === 'pt' ? 'pt-BR' : 'en'}>
-	<Fragment set:html={post.contentHtml} />
+	<Fragment set:html={sanitizeHtml(post.contentHtml)} />
 </BlogPost>

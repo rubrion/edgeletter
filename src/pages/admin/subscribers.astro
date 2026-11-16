@@ -1,15 +1,19 @@
 ---
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../db';
 import { loadSettings } from '../../lib/settings';
 import AdminAppbar from '../../components/AdminAppbar.astro';
 import AdminHead from '../../components/AdminHead.astro';
 
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const themeColor = settings.themePrimaryColor;
 
 const db = getDbInstance();
-const rows = await db.select().from(subscribers).orderBy(desc(subscribers.createdAt));
+const rows = await db
+  .select()
+  .from(subscribers)
+  .where(eq(subscribers.publicationId, Astro.locals.publication.id))
+  .orderBy(desc(subscribers.createdAt));
 
 const saved = Astro.url.searchParams.get('saved') === '1';
 const error = Astro.url.searchParams.get('error');

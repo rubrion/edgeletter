@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../../../../db';
 
-export const POST: APIRoute = async ({ request, params, redirect }) => {
+export const POST: APIRoute = async ({ request, params, redirect, locals }) => {
   const id = params.id;
   const ct = request.headers.get('content-type') ?? '';
   const isJson = ct.includes('application/json');
@@ -13,7 +13,7 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
   }
 
   const db = getDbInstance();
-  await db.delete(subscribers).where(eq(subscribers.id, id));
+  await db.delete(subscribers).where(and(eq(subscribers.id, id), eq(subscribers.publicationId, locals.publication.id)));
 
   if (isJson) return Response.json({ ok: true }, { status: 200 });
   return redirect('/admin/subscribers?saved=1', 303);

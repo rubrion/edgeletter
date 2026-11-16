@@ -2,8 +2,10 @@ import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { and, eq, inArray } from 'drizzle-orm';
 import { marked } from 'marked';
-import { dispatchCampaign } from '../../lib/dispatch';
-import { getDbInstance, campaigns, posts, subscribers, type Post } from '../../db';
+import { audienceFor, CampaignAlreadyLive, enqueueCampaign, liveCampaignFor, retireStaleCampaigns } from '../../lib/email-queue';
+import { sanitizeHtml } from '../../lib/sanitize';
+import { pubId } from '../../lib/tenant';
+import { getDbInstance, campaigns, posts, type Post } from '../../db';
 
 type PublishBody = {
   id?: string;
@@ -28,7 +30,8 @@ const slugify = (s: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
+  const publicationId = pubId(locals);
   let body: PublishBody;
   try {
     body = (await request.json()) as PublishBody;
@@ -42,7 +45,7 @@ export const POST: APIRoute = async ({ request }) => {
   if (!title || !slug || !contentMd) {
     return Response.json({ error: 'title, slug, content_md required' }, { status: 400 });
   }
-  const contentHtml = await marked.parse(contentMd, { async: true });
+  const contentHtml = sanitizeHtml(await marked.parse(contentMd, { async: true }));
   const lang = body.lang === 'pt' ? 'pt' : 'en';
   const canonicalUrl = /^https:\/\//.test(body.canonical_url ?? '') ? body.canonical_url! : null;
   const stamped = body.published_at && !Number.isNaN(Date.parse(body.published_at)) ? new Date(body.published_at) : null;
@@ -51,28 +54,26 @@ export const POST: APIRoute = async ({ request }) => {
 
   let existing: Post | undefined;
   if (body.id) {
-    [existing] = await db.select().from(posts).where(eq(posts.id, body.id)).limit(1);
+    [existing] = await db
+      .select()
+      .from(posts)
+      .where(and(eq(posts.id, body.id), eq(posts.publicationId, publicationId)))
+      .limit(1);
     if (!existing) return Response.json({ error: 'post not found' }, { status: 404 });
   } else {
     // No id: a sync matches the post by its slug, so running it again updates instead of duplicating.
-    [existing] = await db.select().from(posts).where(eq(posts.slug, slug)).limit(1);
+    [existing] = await db
+      .select()
+      .from(posts)
+      .where(and(eq(posts.slug, slug), eq(posts.publicationId, publicationId)))
+      .limit(1);
   }
 
-  // Has a successful campaign already gone out? If so, never re-send.
-  const priorCampaign = existing
-    ? (
-        await db
-          .select()
-          .from(campaigns)
-          .where(
-            and(
-              eq(campaigns.postId, existing.id),
-              inArray(campaigns.status, ['sent', 'partial']),
-            ),
-          )
-          .limit(1)
-      )[0]
-    : undefined;
+  // Has a campaign already gone out (or is one in flight)? If so, never re-send.
+  // Campaigns stuck in queued/sending for hours are retired first so they
+  // don't block forever.
+  if (existing) await retireStaleCampaigns(existing.id);
+  const priorCampaign = existing ? await liveCampaignFor(existing.id) : undefined;
   const alreadySent = !!priorCampaign;
 
   // Only stamp publishedAt on the first draft → published transition.
@@ -96,13 +97,14 @@ export const POST: APIRoute = async ({ request }) => {
             ? { isPublished: true }
             : {}),
       })
-      .where(eq(posts.id, existing.id))
+      .where(and(eq(posts.id, existing.id), eq(posts.publicationId, publicationId)))
       .returning();
     saved = updated!;
   } else {
     const [inserted] = await db
       .insert(posts)
       .values({
+        publicationId,
         title,
         slug,
         contentMd,
@@ -130,45 +132,22 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const activeSubs = await db
-    .select({ id: subscribers.id, email: subscribers.email })
-    .from(subscribers)
-    .where(and(eq(subscribers.status, 'active'), eq(subscribers.lang, saved.lang)));
-
-  let dispatchResult;
+  const subscriberIds = await audienceFor(publicationId, saved.lang);
   try {
-    dispatchResult = await dispatchCampaign({ env, post: saved, subscribers: activeSubs });
+    const result = await enqueueCampaign({ env, publicationId, post: saved, subscriberIds });
+    const [campaignRow] = await db.select().from(campaigns).where(eq(campaigns.id, result.campaignId)).limit(1);
+    return Response.json({
+      post: saved,
+      campaign: campaignRow,
+      dispatch: { recipients: result.recipients, queued: result.queued, sent: campaignRow?.sent ?? 0, failed: campaignRow?.failed ?? 0 },
+      alreadySent: false,
+    });
   } catch (err) {
+    if (err instanceof CampaignAlreadyLive) {
+      // A concurrent publish of the same post won the race.
+      return Response.json({ post: saved, campaign: await liveCampaignFor(saved.id), dispatch: null, alreadySent: true });
+    }
     const msg = err instanceof Error ? err.message : String(err);
-    const [failedRow] = await db
-      .insert(campaigns)
-      .values({
-        postId: saved.id,
-        sentAt: new Date(),
-        status: 'failed',
-        providerUsed: (env.EMAIL_PROVIDER as string) === 'GMAIL' ? 'GMAIL' : 'RESEND',
-      })
-      .returning();
-    return Response.json(
-      { post: saved, campaign: failedRow, dispatch: null, alreadySent: false, error: msg },
-      { status: 502 },
-    );
+    return Response.json({ post: saved, campaign: null, dispatch: null, alreadySent: false, error: msg }, { status: 502 });
   }
-
-  const [campaignRow] = await db
-    .insert(campaigns)
-    .values({
-      postId: saved.id,
-      sentAt: new Date(),
-      status: dispatchResult.status,
-      providerUsed: dispatchResult.provider,
-    })
-    .returning();
-
-  return Response.json({
-    post: saved,
-    campaign: campaignRow,
-    dispatch: dispatchResult,
-    alreadySent: false,
-  });
 };

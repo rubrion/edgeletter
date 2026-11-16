@@ -1,10 +1,10 @@
 import rss from '@astrojs/rss';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { getDbInstance, posts } from '../db';
 import { loadSettings } from '../lib/settings';
 
 export async function GET(context) {
-	const settings = await loadSettings();
+	const settings = await loadSettings(context.locals.publication.id);
 	const clientName = settings.clientName;
 	const description = `Latest posts from ${clientName}.`;
 
@@ -17,7 +17,7 @@ export async function GET(context) {
 			publishedAt: posts.publishedAt,
 		})
 		.from(posts)
-		.where(eq(posts.isPublished, true))
+		.where(and(eq(posts.publicationId, context.locals.publication.id), eq(posts.isPublished, true)))
 		.orderBy(desc(posts.publishedAt));
 
 	return rss({

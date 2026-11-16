@@ -4,7 +4,7 @@ import { loadSettings } from '../lib/settings';
 import HeaderLink from './HeaderLink.astro';
 import LogoMark from './LogoMark.astro';
 
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const clientName = settings.clientName;
 const logoUrl = settings.clientLogoUrl || null;
 

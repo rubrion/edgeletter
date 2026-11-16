@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
-import { eq } from "drizzle-orm";
-import { getDbInstance, settings } from "../db";
+import { and, eq } from "drizzle-orm";
+import { DEFAULT_PUBLICATION_ID, getDbInstance, settings } from "../db";
 
 export type Settings = {
   clientName: string;
@@ -134,19 +134,31 @@ const ENV_KEY: Partial<Record<SettingKey, string>> = {
   themePrimaryColor: "THEME_PRIMARY_COLOR",
 };
 
-const envValue = (key: SettingKey): string => {
+// Env seeds only apply to the default publication (single-tenant deploys);
+// self-serve publications start from FALLBACKS.
+const envValue = (publicationId: string, key: SettingKey): string => {
+  if (publicationId !== DEFAULT_PUBLICATION_ID) return "";
   const name = ENV_KEY[key];
   if (!name) return "";
   const v = (env as unknown as Record<string, string | undefined>)[name];
   return typeof v === "string" ? v : "";
 };
 
-export const loadSettings = async (): Promise<Settings> => {
+// Header, footer, head and page each ask for settings on one request; a short
+// per-isolate cache keeps that to one D1 read. Saves invalidate it.
+const CACHE_TTL_MS = 5_000;
+const cache = new Map<string, { value: Settings; at: number }>();
+
+export const loadSettings = async (publicationId: string): Promise<Settings> => {
+  const hit = cache.get(publicationId);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
+
   let rows: { key: string; value: string }[] = [];
   try {
     rows = await getDbInstance()
       .select({ key: settings.key, value: settings.value })
-      .from(settings);
+      .from(settings)
+      .where(eq(settings.publicationId, publicationId));
   } catch {
     // Settings table may not exist yet (e.g. fresh deploy before migration). Fall back gracefully.
     rows = [];
@@ -156,15 +168,17 @@ export const loadSettings = async (): Promise<Settings> => {
   const out = {} as Settings;
   for (const key of SETTING_KEYS) {
     out[key] = (dbMap[key]?.trim() ||
-      envValue(key).trim() ||
+      envValue(publicationId, key).trim() ||
       FALLBACKS[key]) as string;
   }
+  cache.set(publicationId, { value: out, at: Date.now() });
   return out;
 };
 
-export const saveSettings = async (patch: Partial<Settings>): Promise<void> => {
+export const saveSettings = async (publicationId: string, patch: Partial<Settings>): Promise<void> => {
   const db = getDbInstance();
   const now = new Date();
+  cache.delete(publicationId);
   for (const key of SETTING_KEYS) {
     if (!(key in patch)) continue;
     const raw = patch[key];
@@ -172,17 +186,20 @@ export const saveSettings = async (patch: Partial<Settings>): Promise<void> => {
     const value = raw.trim();
     if (value === "") {
       // Empty ⇒ revert to env fallback by removing the override row.
-      await db.delete(settings).where(eq(settings.key, key));
+      await db
+        .delete(settings)
+        .where(and(eq(settings.publicationId, publicationId), eq(settings.key, key)));
       continue;
     }
     await db
       .insert(settings)
-      .values({ key, value, updatedAt: now })
+      .values({ publicationId, key, value, updatedAt: now })
       .onConflictDoUpdate({
-        target: settings.key,
+        target: [settings.publicationId, settings.key],
         set: { value, updatedAt: now },
       });
   }
+  cache.delete(publicationId);
 };
 
 // Convert "#RRGGBB" / "#RGB" to "r, g, b" tuple string, suitable for use in

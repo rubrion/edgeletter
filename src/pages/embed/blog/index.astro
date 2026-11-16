@@ -1,7 +1,7 @@
 ---
 import { Font } from 'astro:assets';
 import '../../../styles/embed.css';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { getDbInstance, posts } from '../../../db';
 import { loadSettings, hexToRgbTuple } from '../../../lib/settings';
 import { getLang, useTranslations } from '../../../i18n';
@@ -11,7 +11,7 @@ Astro.response.headers.set('Content-Security-Policy', 'frame-ancestors *');
 Astro.response.headers.set('X-Frame-Options', 'ALLOWALL');
 Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=60');
 
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const t = useTranslations(getLang(Astro.request));
 
 const q = Astro.url.searchParams;
@@ -47,7 +47,7 @@ const rows = await db
     contentMd: posts.contentMd,
   })
   .from(posts)
-  .where(eq(posts.isPublished, true))
+  .where(and(eq(posts.publicationId, Astro.locals.publication.id), eq(posts.isPublished, true)))
   .orderBy(desc(posts.publishedAt))
   .limit(limit);
 

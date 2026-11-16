@@ -44,6 +44,8 @@ type AiUsage = { used: number; limit: number };
 type Props = {
   recent: RecentPost[];
   initialAiUsage: AiUsage | null;
+  /** Post to open on load (from /admin?post=<id>); otherwise a blank draft. */
+  openId?: string | null;
 };
 
 type Draft = {
@@ -83,10 +85,20 @@ const formatSentAt = (iso: string): string => {
   }
 };
 
-export default function AdminEditor({ recent, initialAiUsage }: Props) {
+const toDraft = (p: RecentPost): Draft => ({
+  id: p.id,
+  title: p.title,
+  slug: p.slug,
+  contentMd: p.contentMd,
+  isPublished: p.isPublished,
+  lastSentAt: p.lastSentAt,
+});
+
+export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
   const [posts, setPosts] = useState<RecentPost[]>(recent);
-  const [draft, setDraft] = useState<Draft>(blank);
-  const [slugDirty, setSlugDirty] = useState(false);
+  const opened = openId ? recent.find((p) => p.id === openId) : undefined;
+  const [draft, setDraft] = useState<Draft>(opened ? toDraft(opened) : blank);
+  const [slugDirty, setSlugDirty] = useState(!!opened);
   const [busy, setBusy] = useState<'idle' | 'saving' | 'publishing' | 'deleting' | 'uploading' | 'reviewing'>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);

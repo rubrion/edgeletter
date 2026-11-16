@@ -20,7 +20,7 @@ const recent = await db
   .from(posts)
   .where(eq(posts.publicationId, Astro.locals.publication.id))
   .orderBy(desc(posts.publishedAt))
-  .limit(20);
+  .limit(100);
 
 // Aggregate the latest successful campaign per post (single round-trip).
 const lastSentByPost = new Map<string, Date>();
@@ -110,7 +110,7 @@ const recentSerialized = recent.map((p) => ({
 <body style={`--theme: ${themeColor}`}>
   <AdminAppbar current="posts" />
   <div style="flex: 1; min-height: 0;">
-    <AdminEditor client:only="react" recent={recentSerialized} initialAiUsage={initialAiUsage} />
+    <AdminEditor client:only="react" recent={recentSerialized} initialAiUsage={initialAiUsage} openId={Astro.url.searchParams.get('post')} />
   </div>
 </body>
 </html>

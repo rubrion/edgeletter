@@ -7,6 +7,7 @@
 
 body {
 	--accent: var(--theme, #B44A27);
+	--sidebar-w: 248px;
 	--accent-deep: color-mix(in srgb, var(--accent) 45%, #000);
 	margin: 0;
 	min-height: 100vh;
@@ -138,6 +139,7 @@ button, .button {
 	font-family: var(--font-body-stack);
 }
 button[type="submit"], .button {
+	text-decoration: none;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -203,4 +205,10 @@ tbody tr:hover { background: rgba(var(--gray-light), 0.35); }
 	.wrap { margin-top: 1.5rem; }
 	.wrap > .card { padding: 1.75rem 1.25rem; }
 	h1 { font-size: 2.1rem; }
+}
+
+/* App shell: content sits to the right of the fixed sidebar (AdminAppbar). */
+body:has(> .app-sidebar) { padding-left: var(--sidebar-w); }
+@media (max-width: 900px) {
+	body:has(> .app-sidebar) { padding-left: 0; }
 }

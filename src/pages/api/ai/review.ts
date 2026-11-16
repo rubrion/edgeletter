@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
 import { limitsFor } from '../../../lib/plans';
-import { and, eq, sql } from 'drizzle-orm';
 import { env } from 'cloudflare:workers';
-import { aiUsage, getDbInstance } from '../../../db';
+import { adjustAiTokens, reserveAiTokens, utcDay } from '../../../lib/ai-budget';
+import { allow } from '../../../lib/ratelimit';
 
 const MAX_INPUT_CHARS = 50_000;
 const MAX_OUTPUT_TOKENS = 8192;
@@ -31,10 +31,9 @@ const json = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-const today = (): string => new Date().toISOString().slice(0, 10);
-
+// The system prompt is sent with every call, so it counts toward the input.
 const estimateInputTokens = (inputChars: number): number =>
-  Math.ceil(inputChars / CHARS_PER_TOKEN);
+  Math.ceil((inputChars + SYSTEM_PROMPT.length) / CHARS_PER_TOKEN);
 
 const projectOutputTokens = (inputTokens: number): number =>
   Math.min(MAX_OUTPUT_TOKENS, Math.ceil(inputTokens * OUTPUT_OVERHEAD_RATIO) + OUTPUT_BUFFER_TOKENS);
@@ -65,28 +64,32 @@ export const POST: APIRoute = async ({ request, locals }) => {
     );
   }
 
-  const db = getDbInstance();
-  const day = today();
+  // Per-user burst limit (shared limiter: 5 per minute).
+  if (!(await allow(`ai:${locals.user?.id ?? publicationId}`))) {
+    return json({ error: 'too many AI reviews — wait a minute', code: 'rate' }, 429);
+  }
 
-  const existing = await db
-    .select()
-    .from(aiUsage)
-    .where(and(eq(aiUsage.publicationId, publicationId), eq(aiUsage.day, day)))
-    .limit(1);
-  const usedToday = existing[0]?.tokensUsed ?? 0;
+  const day = utcDay();
   const inputTokens = estimateInputTokens(contentMd.length);
   const projectedOutputTokens = projectOutputTokens(inputTokens);
   const projectedTotal = inputTokens + projectedOutputTokens;
-  if (usedToday + projectedTotal > limit) {
+
+  // Reserve the worst case up front; settle to actual usage afterwards.
+  const reservation = await reserveAiTokens(publicationId, projectedTotal, limit, day);
+  if (!reservation.ok) {
     return json(
-      {
-        error: 'daily AI review token budget exhausted — try again tomorrow or shorten the post',
-        used: usedToday,
-        limit,
-      },
+      reservation.reason === 'platform'
+        ? { error: 'AI review is paused for today — try again tomorrow', code: 'platform', used: reservation.used, limit }
+        : {
+            error: 'daily AI review token budget exhausted — try again tomorrow or shorten the post',
+            code: 'budget',
+            used: reservation.used,
+            limit,
+          },
       429,
     );
   }
+  const usedToday = reservation.usedBefore;
 
   let result: AiTextResponse;
   try {
@@ -98,6 +101,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       max_tokens: projectedOutputTokens,
     })) as AiTextResponse;
   } catch (err) {
+    // Failed call: hand the reservation back.
+    await adjustAiTokens(publicationId, -projectedTotal, day);
     return json({ error: err instanceof Error ? err.message : 'Workers AI error' }, 502);
   }
 
@@ -113,13 +118,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       ? (usage.prompt_tokens ?? 0) + (usage.completion_tokens ?? 0)
       : projectedTotal);
 
-  await db
-    .insert(aiUsage)
-    .values({ publicationId, day, tokensUsed: actualTokens })
-    .onConflictDoUpdate({
-      target: [aiUsage.publicationId, aiUsage.day],
-      set: { tokensUsed: sql`${aiUsage.tokensUsed} + ${actualTokens}` },
-    });
+  await adjustAiTokens(publicationId, actualTokens - projectedTotal, day);
 
   return json({ contentMd: improved.trim(), used: usedToday + actualTokens, limit });
 };

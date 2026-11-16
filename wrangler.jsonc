@@ -28,6 +28,8 @@
 		"CF_ZONE_ID": "b7982b3858faae64fb1485148a45e60e",
 		// Platform ceiling on custom hostnames; stays inside Cloudflare's 100 free.
 		"MAX_CUSTOM_HOSTNAMES": "90",
+		// Platform ceiling on AI review tokens per UTC day (~US$0.40/day).
+		"AI_PLATFORM_DAILY_TOKENS": "300000",
 		"MEDIA_PUBLIC_BASE": "https://media.rubrion.ai",
 		"TURNSTILE_SITE_KEY": "0x4AAAAAADMKgjDCOeL0zVJj",
 	},

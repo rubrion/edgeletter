@@ -314,6 +314,7 @@ export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en
       const j = (await res.json().catch(() => ({}))) as {
         contentMd?: string;
         error?: string;
+        code?: 'budget' | 'platform' | 'rate';
         used?: number;
         limit?: number;
       };
@@ -322,7 +323,9 @@ export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en
       }
       if (!res.ok || !j.contentMd) {
         setUndoStack((s) => s.slice(0, -1));
-        setMessage(j.error ?? `AI review failed (${res.status})`);
+        setMessage(
+          j.code === 'budget' ? t('ed.aiBudget') : j.code === 'platform' ? t('ed.aiPlatform') : j.code === 'rate' ? t('ed.aiRate') : (j.error ?? `${t('ed.msgAiError')} (${res.status})`),
+        );
         return;
       }
       setDraft((d) => ({ ...d, contentMd: j.contentMd! }));

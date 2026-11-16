@@ -55,5 +55,10 @@ export default defineConfig({
     },
   ],
 
+  // Astro's form-origin check rejects RFC 8058 one-click unsubscribes (mail
+  // providers POST a form with no Origin header). CSRF is enforced instead in
+  // src/middleware.ts on the app host, the only host with sessions.
+  security: { checkOrigin: false },
+
   adapter: cloudflare(),
 });

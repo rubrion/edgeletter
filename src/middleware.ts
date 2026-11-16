@@ -120,10 +120,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
 
     case 'app': {
-      // Belt and braces on top of SameSite cookies + Astro's form origin check.
-      const origin = request.headers.get('origin');
-      if (request.method !== 'GET' && request.method !== 'HEAD' && origin && origin !== url.origin) {
-        return jsonError(403, 'cross-origin request');
+      // CSRF: session cookies are SameSite=Lax; additionally reject any
+      // state-changing request a browser marks as coming from another site.
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        const origin = request.headers.get('origin');
+        const site = request.headers.get('sec-fetch-site');
+        if ((origin && origin !== url.origin) || (site && site !== 'same-origin' && site !== 'none')) {
+          return jsonError(403, 'cross-origin request');
+        }
       }
 
       const user = await sessionUser(cookies);

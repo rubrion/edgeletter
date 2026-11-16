@@ -175,6 +175,12 @@ export const aiUsage = sqliteTable(
   (t) => ({ pk: primaryKey({ columns: [t.publicationId, t.day] }) }),
 );
 
+/** Platform-wide AI tokens per UTC day, across every publication (cost ceiling). */
+export const aiPlatformUsage = sqliteTable('ai_platform_usage', {
+  day: text('day').primaryKey(),
+  tokensUsed: integer('tokens_used').notNull().default(0),
+});
+
 /** Platform-wide: never email these addresses again (hard bounce, complaint). */
 export const emailSuppressions = sqliteTable('email_suppressions', {
   email: text('email').primaryKey(),

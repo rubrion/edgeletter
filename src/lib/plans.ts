@@ -34,6 +34,8 @@ export const PRO_PRICE = {
   yearly: { brl: 'R$290', usd: 'US$70' },
 } as const;
 export const PROBATION_EMAILS_PER_MONTH = 500;
+/** AI review during the first week: enough to try it on a post or two. */
+export const PROBATION_AI_TOKENS_PER_DAY = 1_500;
 
 export const limitsFor = (pub: Pick<Publication, 'plan' | 'createdAt'>, now = Date.now()): Limits => {
   const base = PLAN_LIMITS[pub.plan];
@@ -41,6 +43,7 @@ export const limitsFor = (pub: Pick<Publication, 'plan' | 'createdAt'>, now = Da
   return {
     ...base,
     emailsPerMonth: probation ? Math.min(base.emailsPerMonth, PROBATION_EMAILS_PER_MONTH) : base.emailsPerMonth,
+    aiTokensPerDay: probation ? Math.min(base.aiTokensPerDay, PROBATION_AI_TOKENS_PER_DAY) : base.aiTokensPerDay,
     probation,
   };
 };

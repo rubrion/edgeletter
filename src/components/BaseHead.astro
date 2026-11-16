@@ -64,6 +64,14 @@ const articleJsonLd =
     var saved = localStorage.getItem('edgeletter-theme');
     var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.dataset.theme = saved || (prefersDark ? 'dark' : 'light');
+    // Opt into scroll reveals before first paint (no flash). If the reveal
+    // script never starts, un-hide everything after a short grace period.
+    if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('reveal-ready');
+      setTimeout(function () {
+        if (!window.__edgeReveal) document.documentElement.classList.remove('reveal-ready');
+      }, 2500);
+    }
   })();
 </script>
 <meta charset="utf-8" />
@@ -86,7 +94,6 @@ const articleJsonLd =
 <meta name="generator" content={Astro.generator} />
 
 <Font cssVariable="--font-display" preload />
-<Font cssVariable="--font-script" />
 <Font cssVariable="--font-body" preload />
 
 <style is:inline set:html={themeCss}></style>

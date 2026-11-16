@@ -46,18 +46,18 @@ const [featured, ...rest] = recent;
 		<Header />
 		<main>
 			<section class="hero">
-				<span class="eyebrow">{t('index.eyebrow')}</span>
-				<h1>{clientName}</h1>
-				<div class="ornament" aria-hidden="true">✦</div>
-				<p class="tagline">{tagline}</p>
+				<span class="eyebrow rise" style="--i: 0">{t('index.eyebrow')}</span>
+				<h1 class="rise" style="--i: 1">{clientName}</h1>
+				<div class="ornament rise" style="--i: 2" aria-hidden="true">✦</div>
+				<p class="tagline rise" style="--i: 3">{tagline}</p>
 			</section>
 		</main>
 		{featured && (
 			<section class="latest pocket" aria-labelledby="latest-heading">
-				<span class="pocket-label deboss" aria-hidden="true">{t('index.latestLabel')}</span>
+				<span class="pocket-label deboss reveal" aria-hidden="true">{t('index.latestLabel')}</span>
 				<h2 id="latest-heading" class="sr-only">{t('index.latestPosts')}</h2>
 				<div class="stack">
-					<a href={`/blog/${featured.slug}`} class="post-card featured card lift">
+					<a href={`/blog/${featured.slug}`} class="post-card featured card lift reveal from-pocket" style="--i: 1">
 						<span class="micro bracket badge">{t('index.featured')}</span>
 						<span class="title">{featured.title}</span>
 						{excerpt(featured.contentMd) && <span class="excerpt">{excerpt(featured.contentMd)}…</span>}
@@ -67,9 +67,9 @@ const [featured, ...rest] = recent;
 					</a>
 					{rest.length > 0 && (
 						<ul class="post-grid">
-							{rest.map((p) => (
+							{rest.map((p, i) => (
 								<li>
-									<a href={`/blog/${p.slug}`} class="post-card card lift">
+									<a href={`/blog/${p.slug}`} class="post-card card lift reveal from-pocket" style={`--i: ${(i % 2) + 1}`}>
 										{p.publishedAt && (
 											<span class="micro date"><FormattedDate date={p.publishedAt} lang={lang} /></span>
 										)}
@@ -79,7 +79,7 @@ const [featured, ...rest] = recent;
 							))}
 						</ul>
 					)}
-					<p class="all"><a href="/blog" class="btn">{t('index.allPosts')}</a></p>
+					<p class="all reveal"><a href="/blog" class="btn">{t('index.allPosts')}</a></p>
 				</div>
 			</section>
 		)}
@@ -114,10 +114,12 @@ const [featured, ...rest] = recent;
 		right: 0;
 		text-align: center;
 		font-family: var(--font-display-stack);
+		font-weight: var(--display-weight);
+		word-spacing: var(--display-words);
 		font-style: italic;
 		font-size: clamp(4rem, 14vw, 11rem);
 		line-height: 1;
-		letter-spacing: -0.03em;
+		letter-spacing: var(--display-tracking);
 		pointer-events: none;
 		user-select: none;
 	}
@@ -140,9 +142,11 @@ const [featured, ...rest] = recent;
 	.post-card:hover { color: var(--text); }
 	.post-card .title {
 		font-family: var(--font-display-stack);
+		font-weight: var(--display-weight);
+		word-spacing: var(--display-words);
 		font-size: 1.65rem;
 		line-height: 1.08;
-		letter-spacing: -0.02em;
+		letter-spacing: var(--display-tracking);
 		color: var(--ink);
 		transition: color 0.2s;
 	}

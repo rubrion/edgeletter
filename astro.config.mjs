@@ -46,24 +46,16 @@ export default defineConfig({
     }),
   ],
 
-  // Stationery type system: condensed editorial serif for display, script for
-  // eyebrows, and a readable serif for body. CLIENT_FONT overrides body only.
+  // Stationery type system: engraved editorial serif for display (its italic
+  // doubles as the eyebrow face), and a readable serif for body. CLIENT_FONT overrides body only.
   fonts: [
     {
       provider: fontProviders.google(),
-      name: 'Instrument Serif',
+      name: 'Cormorant Garamond',
       cssVariable: '--font-display',
       fallbacks: ['Georgia', 'serif'],
-      weights: [400],
+      weights: [500, 600],
       styles: ['normal', 'italic'],
-    },
-    {
-      provider: fontProviders.google(),
-      name: 'Pinyon Script',
-      cssVariable: '--font-script',
-      fallbacks: ['cursive'],
-      weights: [400],
-      styles: ['normal'],
     },
     {
       provider: fontProviders.google(),

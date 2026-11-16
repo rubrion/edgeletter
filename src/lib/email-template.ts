@@ -39,7 +39,7 @@ export const wrapPostInEmail = ({
 <title>${escapeHtml(postTitle)}</title>
 ${E.fontsLink}
 <style>
-  .el-content h1, .el-content h2, .el-content h3, .el-content h4 { font-family:${E.display}; font-weight:400; letter-spacing:-0.02em; line-height:1.1; color:${E.ink}; margin:28px 0 10px; }
+  .el-content h1, .el-content h2, .el-content h3, .el-content h4 { font-family:${E.display}; font-weight:500; letter-spacing:0.005em; word-spacing:0.05em; line-height:1.15; color:${E.ink}; margin:28px 0 10px; }
   .el-content h2 { font-size:28px; } .el-content h3 { font-size:22px; }
   .el-content p { margin:0 0 18px; }
   .el-content a { color:${themeColor}; }
@@ -57,7 +57,7 @@ ${E.fontsLink}
         ${logoUrl ? `<img src="${logoUrl}" width="36" height="36" alt="" style="display:block;margin:0 auto 10px;border:0;">` : ''}<p style="margin:0;${microStyle(deep)}font-size:12px;font-weight:600;text-shadow:0 1px 0 rgba(255,255,255,0.14);">[&nbsp;${escapeHtml(clientName)}&nbsp;]</p>
       </td></tr>
       <tr><td class="el-pad" style="background:${E.card};border:1px solid ${E.hairline};border-top:0;padding:44px 48px 40px;">
-        <h1 class="el-title" style="margin:0 0 14px;font-family:${E.display};font-weight:400;font-size:42px;line-height:1.05;letter-spacing:-0.02em;color:${E.ink};text-align:center;">${escapeHtml(postTitle)}</h1>
+        <h1 class="el-title" style="margin:0 0 14px;font-family:${E.display};font-weight:500;font-size:44px;line-height:1.12;letter-spacing:0.005em;word-spacing:0.05em;color:${E.ink};text-align:center;">${escapeHtml(postTitle)}</h1>
         <p style="margin:0 0 32px;text-align:center;color:${themeColor};font-size:12px;">&mdash;&nbsp;&#10022;&nbsp;&mdash;</p>
         <div class="el-content" style="font-size:17px;line-height:1.7;color:${E.text};">${postHtml}</div>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:36px auto 0;">

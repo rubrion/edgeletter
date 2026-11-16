@@ -34,8 +34,13 @@
 	--deboss-shadow: 0 1px 0 rgba(255, 255, 255, 0.14), 0 -1px 0 rgba(0, 0, 0, 0.2);
 
 	/* Type */
-	--font-display-stack: var(--font-display, 'Instrument Serif'), 'Cormorant Garamond', Georgia, serif;
-	--font-script-stack: var(--font-script, 'Pinyon Script'), 'Snell Roundhand', cursive;
+	--font-display-stack: var(--font-display, 'Cormorant Garamond'), 'Cormorant', Georgia, serif;
+	--display-weight: 500;
+	--display-tracking: 0.005em;
+	--display-words: 0.05em;
+	--display-leading: 1.12;
+	/* Eyebrows: the display face in italic — legible, still ceremonial */
+	--font-eyebrow-stack: var(--font-display-stack);
 	--font-body-stack: var(--font-body, 'Newsreader'), Georgia, 'Times New Roman', serif;
 
 	accent-color: var(--accent);
@@ -83,22 +88,24 @@ html[data-theme="dark"] body::before { mix-blend-mode: screen; }
 /* Script eyebrow above major headings */
 .eyebrow {
 	display: block;
-	font-family: var(--font-script-stack);
-	font-weight: 400;
-	font-size: 1.9rem;
-	line-height: 1;
-	letter-spacing: 0;
+	font-family: var(--font-eyebrow-stack);
+	font-style: italic;
+	font-weight: 500;
+	font-size: 1.55rem;
+	line-height: 1.2;
+	letter-spacing: 0.01em;
 	text-transform: none;
 	color: var(--accent);
 	text-align: center;
-	margin: 0 0 0.35rem;
+	margin: 0 0 0.5rem;
 }
 
 .display {
 	font-family: var(--font-display-stack);
-	font-weight: 400;
-	letter-spacing: -0.02em;
-	line-height: 1.05;
+	font-weight: var(--display-weight);
+	letter-spacing: var(--display-tracking);
+	word-spacing: var(--display-words);
+	line-height: var(--display-leading);
 }
 
 /* Ivory cotton cardstock */
@@ -190,4 +197,59 @@ html[data-theme="dark"] body::before { mix-blend-mode: screen; }
 	clip: rect(1px, 1px, 1px, 1px);
 	clip-path: inset(50%);
 	white-space: nowrap;
+}
+
+/* ---------- Motion ---------- */
+:root {
+	--ease-paper: cubic-bezier(0.2, 0.7, 0.2, 1);
+	--dur-reveal: 0.8s;
+}
+
+/* Cross-document page transitions (native; no router). Header stays put,
+   the page body lifts out and the next one settles in like a fresh sheet. */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: 0.28s ease both vt-out; }
+::view-transition-new(root) { animation: 0.5s var(--ease-paper) both vt-in; }
+@keyframes vt-out { to { opacity: 0; transform: translateY(-10px); } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(14px); } }
+
+/* Load-in stagger for hero blocks: add .rise and optional --i (index) */
+@keyframes rise {
+	from { opacity: 0; transform: translateY(18px); }
+	to { opacity: 1; transform: none; }
+}
+.rise {
+	animation: rise var(--dur-reveal) var(--ease-paper) both;
+	animation-delay: calc(var(--i, 0) * 110ms + 60ms);
+}
+
+/* Scroll reveal: only hidden once JS has opted in (html.reveal-ready), so
+   content is always visible without JS. */
+html.reveal-ready .reveal {
+	opacity: 0;
+	transform: translateY(26px);
+	transition:
+		opacity var(--dur-reveal) var(--ease-paper),
+		transform var(--dur-reveal) var(--ease-paper);
+	transition-delay: calc(var(--i, 0) * 90ms);
+}
+html.reveal-ready .reveal.is-in { opacity: 1; transform: none; }
+/* Cards rise further, as if drawn out of their envelope pocket */
+html.reveal-ready .reveal.from-pocket { transform: translateY(56px); }
+html.reveal-ready .reveal.from-pocket.is-in { transform: none; }
+/* Once revealed, hand transform back to the hover lift */
+html.reveal-ready .reveal.lift.is-in.settled {
+	transition:
+		transform 0.28s var(--ease-paper),
+		box-shadow 0.28s ease;
+	transition-delay: 0s;
+}
+html.reveal-ready .reveal.lift.is-in.settled:hover,
+html.reveal-ready .reveal.lift.is-in.settled:focus-within { transform: translateY(-4px); }
+
+@media (prefers-reduced-motion: reduce) {
+	@view-transition { navigation: none; }
+	.rise { animation: none; }
+	html.reveal-ready .reveal,
+	html.reveal-ready .reveal.from-pocket { opacity: 1; transform: none; transition: none; }
 }

@@ -2,6 +2,7 @@
 import { getLang, useTranslations } from '../i18n';
 import { loadSettings } from '../lib/settings';
 import SubscribeForm from './SubscribeForm.astro';
+import Reveal from './Reveal.astro';
 
 const settings = await loadSettings();
 const clientName = settings.clientName;
@@ -12,8 +13,8 @@ const t = useTranslations(lang);
 ---
 
 <section class="envelope pocket" aria-label={t('subscribe.heading')}>
-	<span class="envelope-mark deboss" aria-hidden="true">{clientName}</span>
-	<div class="envelope-slot lift">
+	<span class="envelope-mark deboss reveal" aria-hidden="true">{clientName}</span>
+	<div class="envelope-slot lift reveal from-pocket" style="--i: 1">
 		<SubscribeForm lang={lang} />
 	</div>
 	<footer class="deboss">
@@ -22,6 +23,7 @@ const t = useTranslations(lang);
 		<span class="micro">{t('footer.rights')}</span>
 	</footer>
 </section>
+<Reveal />
 
 <style>
 	.envelope {
@@ -33,16 +35,17 @@ const t = useTranslations(lang);
 	.envelope-mark {
 		position: absolute;
 		top: 2.75rem;
-		left: 50%;
-		transform: translateX(-50%);
-		width: 100%;
+		left: 0;
+		right: 0;
 		text-align: center;
 		white-space: nowrap;
 		overflow: hidden;
 		font-family: var(--font-display-stack);
+		font-weight: var(--display-weight);
+		word-spacing: var(--display-words);
 		font-size: clamp(3.25rem, 10vw, 7.5rem);
 		line-height: 1;
-		letter-spacing: -0.03em;
+		letter-spacing: var(--display-tracking);
 		pointer-events: none;
 		user-select: none;
 	}

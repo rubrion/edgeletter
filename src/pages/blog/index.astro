@@ -31,9 +31,9 @@ const all = await db
 		<Header />
 		<main>
 			<header class="page-head">
-				<span class="eyebrow">{t('blog.eyebrow')}</span>
-				<h1>{t('blog.title')}</h1>
-				<div class="ornament" aria-hidden="true">✦</div>
+				<span class="eyebrow rise" style="--i: 0">{t('blog.eyebrow')}</span>
+				<h1 class="rise" style="--i: 1">{t('blog.title')}</h1>
+				<div class="ornament rise" style="--i: 2" aria-hidden="true">✦</div>
 			</header>
 			{all.length === 0 ? (
 				<p class="empty">{t('blog.empty')}</p>
@@ -41,7 +41,7 @@ const all = await db
 				<ol class="post-list">
 					{all.map((p, i) => (
 						<li>
-							<a href={`/blog/${p.slug}`} class="card lift">
+							<a href={`/blog/${p.slug}`} class="card lift reveal" style={`--i: ${i % 3}`}>
 								<span class="micro num">{String(all.length - i).padStart(2, '0')}</span>
 								<span class="title">{p.title}</span>
 								{p.publishedAt && (
@@ -81,9 +81,11 @@ const all = await db
 	.post-list .num { color: var(--accent); }
 	.post-list .title {
 		font-family: var(--font-display-stack);
+		font-weight: var(--display-weight);
+		word-spacing: var(--display-words);
 		font-size: 1.6rem;
 		line-height: 1.1;
-		letter-spacing: -0.02em;
+		letter-spacing: var(--display-tracking);
 		color: var(--ink);
 		transition: color 0.2s;
 	}

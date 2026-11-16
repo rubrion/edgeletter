@@ -37,17 +37,17 @@ const eyebrow = Astro.props.eyebrow ?? t('post.eyebrow');
 		<main>
 			<article>
 				<header class="title">
-					<span class="eyebrow">{eyebrow}</span>
-					<h1>{title}</h1>
+					<span class="eyebrow rise" style="--i: 0">{eyebrow}</span>
+					<h1 class="rise" style="--i: 1">{title}</h1>
 					{pubDate ? (
-						<div class="micro bracket date">
+						<div class="micro bracket date rise" style="--i: 2">
 							<FormattedDate date={pubDate} lang={lang} />
 						</div>
 					) : (
-						<div class="ornament" aria-hidden="true">✦</div>
+						<div class="ornament rise" style="--i: 2" aria-hidden="true">✦</div>
 					)}
 				</header>
-				<div class="sheet card">
+				<div class="sheet card rise" style="--i: 3">
 					<div class="prose">
 						<slot />
 					</div>
@@ -87,6 +87,8 @@ const eyebrow = Astro.props.eyebrow ?? t('post.eyebrow');
 	.prose > :global(div > p:first-of-type)::first-letter {
 		float: left;
 		font-family: var(--font-display-stack);
+		font-weight: var(--display-weight);
+		word-spacing: var(--display-words);
 		font-size: 4.4em;
 		line-height: 0.82;
 		padding: 0.06em 0.12em 0 0;

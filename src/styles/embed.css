@@ -14,7 +14,7 @@ html {
 	--c-shadow: 0 4px 12px rgba(35, 25, 15, 0.08);
 	--c-shadow-lift: 0 12px 24px rgba(35, 25, 15, 0.14);
 	--c-grain: 0.04;
-	--display: var(--font-display, 'Instrument Serif'), 'Cormorant Garamond', Georgia, serif;
+	--display: var(--font-display, 'Cormorant Garamond'), Georgia, serif;
 	color-scheme: light;
 }
 html[data-theme="dark"] {
@@ -106,9 +106,10 @@ a.post:focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; }
 .row { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
 .title {
 	font-family: var(--display);
-	font-size: 1.4rem;
+	font-weight: 500;
+	font-size: 1.45rem;
 	line-height: 1.1;
-	letter-spacing: -0.02em;
+	letter-spacing: 0.005em;
 	color: var(--c-heading);
 	transition: color 0.2s;
 }
@@ -128,10 +129,10 @@ a.post:hover .title { color: var(--accent); }
 .post-head { text-align: center; margin-bottom: 1.75rem; }
 h1 {
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: 500;
 	font-size: clamp(2rem, 6vw, 2.8rem);
 	line-height: 1.05;
-	letter-spacing: -0.02em;
+	letter-spacing: 0.005em;
 	color: var(--c-heading);
 	margin: 0 0 0.75rem;
 }
@@ -147,8 +148,8 @@ h1 {
 .content > :first-child { margin-top: 0; }
 .content :is(h2, h3, h4) {
 	font-family: var(--display);
-	font-weight: 400;
-	letter-spacing: -0.02em;
+	font-weight: 500;
+	letter-spacing: 0.005em;
 	line-height: 1.1;
 	color: var(--c-heading);
 }

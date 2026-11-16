@@ -41,6 +41,7 @@ const links: { key: NonNullable<Props['current']>; href: string; label: string }
 
 <style>
   .admin-appbar {
+    view-transition-name: admin-bar;
     --accent: var(--theme);
     position: relative;
     z-index: 5;
@@ -58,8 +59,10 @@ const links: { key: NonNullable<Props['current']>; href: string; label: string }
     align-items: baseline;
     gap: 0.6rem;
     font-family: var(--font-display-stack);
+    font-weight: var(--display-weight);
+    word-spacing: var(--display-words);
     font-size: 1.5rem;
-    letter-spacing: -0.02em;
+    letter-spacing: var(--display-tracking);
     line-height: 1;
     color: var(--ink);
     text-decoration: none;
@@ -68,7 +71,9 @@ const links: { key: NonNullable<Props['current']>; href: string; label: string }
   .brand { align-items: center; }
   .brand .mark { flex: none; display: block; box-shadow: var(--shadow-paper); }
   .brand-sub {
-    font-family: var(--font-script-stack);
+    font-family: var(--font-eyebrow-stack);
+    font-style: italic;
+    font-weight: 500;
     font-size: 1.15rem;
     letter-spacing: 0;
     color: var(--accent);

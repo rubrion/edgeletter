@@ -2,19 +2,24 @@
 import PlatformLayout from '../../layouts/PlatformLayout.astro';
 import { excerptOf, recentListedPosts } from '../../lib/discovery';
 import { publicationOrigin } from '../../lib/tenant';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
+const lang = getLang(Astro.request);
+const t = studio(lang);
 
 const PAGE = 20;
 const page = Math.max(1, Number.parseInt(Astro.url.searchParams.get('page') ?? '1', 10) || 1);
 const rows = await recentListedPosts(PAGE + 1, (page - 1) * PAGE);
 const more = rows.length > PAGE;
 const items = rows.slice(0, PAGE);
-const fmt = (d: Date | null) => (d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+const fmt = (d: Date | null) => (d ? d.toLocaleDateString(lang === 'pt-BR' ? 'pt-BR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 ---
 
-<PlatformLayout title="Explore — EdgeLetter" description="Recent posts from publications on EdgeLetter.">
+<PlatformLayout title={t('pf.exploreTitle')} description={t('pf.exploreDesc')}>
 	<main>
-		<header class="head"><span class="eyebrow rise">The reading room</span><h1 class="rise" style="--i:1">Explore</h1></header>
-		{items.length === 0 ? <p style="text-align:center;font-style:italic;color:var(--muted)">Nothing here yet.</p> : (
+		<header class="head"><span class="eyebrow rise">{t('pf.readingRoom')}</span><h1 class="rise" style="--i:1">{t('pf.explore')}</h1></header>
+		{items.length === 0 ? <p style="text-align:center;font-style:italic;color:var(--muted)">{t('pf.nothing')}</p> : (
 			<ol class="feed">
 				{items.map((p) => (
 					<li class="reveal">
@@ -28,8 +33,8 @@ const fmt = (d: Date | null) => (d ? d.toLocaleDateString('en-US', { month: 'sho
 			</ol>
 		)}
 		<nav class="pager">
-			{page > 1 && <a class="btn secondary" href={`/explore?page=${page - 1}`}>Newer</a>}
-			{more && <a class="btn secondary" href={`/explore?page=${page + 1}`}>Older</a>}
+			{page > 1 && <a class="btn secondary" href={`/explore?page=${page - 1}`}>{t('pf.newer')}</a>}
+			{more && <a class="btn secondary" href={`/explore?page=${page + 1}`}>{t('pf.older')}</a>}
 		</nav>
 	</main>
 	<style>

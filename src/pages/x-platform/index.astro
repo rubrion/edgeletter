@@ -3,35 +3,40 @@ import PlatformLayout from '../../layouts/PlatformLayout.astro';
 import { excerptOf, recentListedPosts } from '../../lib/discovery';
 import { PLAN_LIMITS, PRO_PRICE } from '../../lib/plans';
 import { platformOrigin, publicationOrigin } from '../../lib/tenant';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
 
 const app = platformOrigin(Astro.url, 'app');
+const lang = getLang(Astro.request);
+const t = studio(lang);
+const loc = lang === 'pt-BR' ? 'pt-BR' : 'en-US';
 const latest = await recentListedPosts(6);
-const fmt = (d: Date | null) => (d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+const fmt = (d: Date | null) => (d ? d.toLocaleDateString(loc, { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 ---
 
-<PlatformLayout title="EdgeLetter — newsletters, written by hand" description="Start a newsletter and blog on your own address in a minute. Free to start.">
+<PlatformLayout title={t('pf.title')} description={t('pf.description')}>
 	<main>
 		<section class="hero">
-			<span class="eyebrow rise" style="--i:0">The Correspondence, for everyone</span>
-			<h1 class="rise" style="--i:1">Write it once.<br />Send it to everyone who asked.</h1>
+			<span class="eyebrow rise" style="--i:0">{t('pf.heroEyebrow')}</span>
+			<h1 class="rise" style="--i:1">{t('pf.heroTitle1')}<br />{t('pf.heroTitle2')}</h1>
 			<div class="ornament rise" style="--i:2" aria-hidden="true">✦</div>
-			<p class="tagline rise" style="--i:3">A blog and a newsletter on your own address. Readers subscribe; your posts land in their inbox. Free to start.</p>
-			<p class="rise" style="--i:4"><a class="btn" href={`${app}/signin`}>Start your publication</a></p>
+			<p class="tagline rise" style="--i:3">{t('pf.heroLead')}</p>
+			<p class="rise" style="--i:4"><a class="btn" href={`${app}/signin`}>{t('pf.start')}</a></p>
 		</section>
 	</main>
 
 	<section class="features pocket">
-		<span class="pocket-label deboss" aria-hidden="true">How</span>
+		<span class="pocket-label deboss" aria-hidden="true">{t('pf.how')}</span>
 		<div class="grid">
-			<div class="card lift reveal from-pocket" style="--i:1"><span class="micro bracket">Write</span><h3>An editor that stays out of the way</h3><p>Markdown, images and video, with an optional AI proofread.</p></div>
-			<div class="card lift reveal from-pocket" style="--i:2"><span class="micro bracket">Send</span><h3>Every post, to every reader</h3><p>Double opt-in, one-click unsubscribe and bounce handling, done for you.</p></div>
-			<div class="card lift reveal from-pocket" style="--i:3"><span class="micro bracket">Own</span><h3>Your list, your address</h3><p>Export subscribers anytime. Bring your own domain on Pro.</p></div>
+			<div class="card lift reveal from-pocket" style="--i:1"><span class="micro bracket">{t('pf.write')}</span><h3>{t('pf.writeTitle')}</h3><p>{t('pf.writeBody')}</p></div>
+			<div class="card lift reveal from-pocket" style="--i:2"><span class="micro bracket">{t('pf.send')}</span><h3>{t('pf.sendTitle')}</h3><p>{t('pf.sendBody')}</p></div>
+			<div class="card lift reveal from-pocket" style="--i:3"><span class="micro bracket">{t('pf.own')}</span><h3>{t('pf.ownTitle')}</h3><p>{t('pf.ownBody')}</p></div>
 		</div>
 	</section>
 
 	{latest.length > 0 && (
 		<main class="latest">
-			<header class="head"><span class="eyebrow">Fresh from the press</span><h2>Recently published</h2></header>
+			<header class="head"><span class="eyebrow">{t('pf.freshEyebrow')}</span><h2>{t('pf.freshTitle')}</h2></header>
 			<ul class="posts">
 				{latest.map((p) => (
 					<li class="reveal">
@@ -44,15 +49,15 @@ const fmt = (d: Date | null) => (d ? d.toLocaleDateString('en-US', { month: 'sho
 					</li>
 				))}
 			</ul>
-			<p style="text-align:center"><a class="btn secondary" href="/explore">Explore everything</a></p>
+			<p style="text-align:center"><a class="btn secondary" href="/explore">{t('pf.exploreAll')}</a></p>
 		</main>
 	)}
 
 	<main class="pricing">
-		<header class="head"><span class="eyebrow">Plain terms</span><h2>Free to start</h2></header>
+		<header class="head"><span class="eyebrow">{t('pf.plainTerms')}</span><h2>{t('pf.freeToStart')}</h2></header>
 		<div class="plans">
-			<div class="card plan"><span class="micro bracket">Free</span><p class="price"><strong>Free</strong> <span>· forever</span></p><ul><li>{PLAN_LIMITS.free.subscribers.toLocaleString()} subscribers</li><li>{PLAN_LIMITS.free.emailsPerMonth.toLocaleString()} emails a month</li><li>yourname.edgeletter.blog</li></ul></div>
-			<div class="card plan featured"><span class="micro bracket">Pro</span><p class="price"><strong>{PRO_PRICE.monthly.brl}</strong>/month <span>· {PRO_PRICE.monthly.usd} outside Brazil</span></p><p class="launch">Launch price, kept for as long as you stay subscribed.</p><ul><li>{PLAN_LIMITS.pro.subscribers.toLocaleString()} subscribers</li><li>{PLAN_LIMITS.pro.emailsPerMonth.toLocaleString()} emails a month</li><li>Your own domain</li><li>No EdgeLetter watermark</li></ul></div>
+			<div class="card plan"><span class="micro bracket">{t('pf.free')}</span><p class="price"><strong>{t('pf.free')}</strong> <span>{t('pf.forever')}</span></p><ul><li>{t('pf.subs', { n: PLAN_LIMITS.free.subscribers.toLocaleString(loc) })}</li><li>{t('pf.emails', { n: PLAN_LIMITS.free.emailsPerMonth.toLocaleString(loc) })}</li><li>{t('pf.handleDomain')}</li></ul></div>
+			<div class="card plan featured"><span class="micro bracket">{t('pf.pro')}</span><p class="price"><strong>{PRO_PRICE.monthly.brl}</strong>{t('pf.perMonth')} <span>{t('pf.outsideBrazil', { usd: PRO_PRICE.monthly.usd })}</span></p><p class="launch">{t('pf.launch')}</p><ul><li>{t('pf.subs', { n: PLAN_LIMITS.pro.subscribers.toLocaleString(loc) })}</li><li>{t('pf.emails', { n: PLAN_LIMITS.pro.emailsPerMonth.toLocaleString(loc) })}</li><li>{t('pf.ownDomain')}</li><li>{t('pf.noWatermark')}</li></ul></div>
 		</div>
 	</main>
 

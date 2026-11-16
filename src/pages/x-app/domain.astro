@@ -6,8 +6,12 @@ import { cnameTarget, createHostname, customDomainsEnabled, customHostnamesInUse
 import { limitsFor } from '../../lib/plans';
 import { invalidatePublicationCache, platformDomain } from '../../lib/tenant';
 import { PENDING_TTL_MS } from '../../lib/custom-hostnames';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
 
 const { publication } = Astro.locals as Required<App.Locals>;
+const t = studio(getLang(Astro.request));
 const db = getDbInstance();
 const allowed = limitsFor(publication).customDomain;
 let error: string | null = null;
@@ -27,11 +31,11 @@ if (Astro.request.method === 'POST' && customDomainsEnabled()) {
 	try {
 		if (action === 'add' && allowed && !row.cfHostnameId) {
 			const host = validCustomHost(String(form.get('host') ?? ''));
-			if (!host) error = 'Enter a domain like newsletter.example.com.';
+			if (!host) error = t('dom.errFormat');
 			else {
 				const [taken] = await db.select({ id: publications.id }).from(publications).where(eq(publications.customDomain, host)).limit(1);
-				if (taken) error = 'That domain is already connected to another publication.';
-				else if ((await customHostnamesInUse()) >= maxCustomHostnames()) error = 'Custom domains are at capacity right now. Please try again later.';
+				if (taken) error = t('dom.errTaken');
+				else if ((await customHostnamesInUse()) >= maxCustomHostnames()) error = t('dom.errCapacity');
 				else {
 					state = await createHostname(host);
 					await db
@@ -64,39 +68,39 @@ if (row.cfHostnameId && row.pendingDomain && customDomainsEnabled()) {
 }
 ---
 
-<AppLayout title="Domain" current="domain">
+<AppLayout title={t('nav.domain')} current="domain">
 	<div class="card app-card">
 		<header class="page-head">
-			<span class="eyebrow">Your own address</span>
-			<h1>Custom domain</h1>
-			<p class="sub">Your publication always lives at {publication.handle}.{platformDomain()}. On Pro you can also serve it from your own domain.</p>
+			<span class="eyebrow">{t('dom.eyebrow')}</span>
+			<h1>{t('dom.heading')}</h1>
+			<p class="sub">{t('dom.lead', { host: `${publication.handle}.${platformDomain()}` })}</p>
 		</header>
 		{error && <div class="alert err">{error}</div>}
 
 		{!customDomainsEnabled() ? (
-			<p class="empty">Custom domains aren't available yet.</p>
+			<p class="empty">{t('dom.unavailable')}</p>
 		) : !allowed ? (
-			<p>Custom domains are part of Pro. <a href="/billing">See plans</a>.</p>
+			<p>{t('dom.proOnly')} <a href="/billing">{t('dom.seePlans')}</a>.</p>
 		) : row.pendingDomain ? (
 			<div class="stack">
 				<dl class="kv">
-					<dt>Domain</dt><dd>{row.pendingDomain}</dd>
-					<dt>Status</dt><dd><span class="badge">{row.customDomain === row.pendingDomain ? 'live' : (state?.status ?? 'pending')}</span> {state && state.sslStatus !== 'active' && <span class="muted">certificate: {state.sslStatus}</span>}</dd>
+					<dt>{t('dom.domain')}</dt><dd>{row.pendingDomain}</dd>
+					<dt>{t('dom.status')}</dt><dd><span class="badge">{row.customDomain === row.pendingDomain ? t('dom.live') : (state?.status ?? t('dom.pending'))}</span> {state && state.sslStatus !== 'active' && <span class="muted">{t('dom.cert', { s: state.sslStatus })}</span>}</dd>
 				</dl>
 				{row.customDomain !== row.pendingDomain && (
 					<>
-						<p>At your DNS provider, add this record. Activation usually takes a few minutes; refresh this page to check. Setups not finished within {Math.round(PENDING_TTL_MS / 86400000)} days are removed automatically.</p>
-						<table><thead><tr><th>Type</th><th>Name</th><th>Target</th></tr></thead><tbody><tr><td>CNAME</td><td><code>{row.pendingDomain}</code></td><td><code>{cnameTarget()}</code></td></tr></tbody></table>
+						<p>{t('dom.dnsHelp', { n: Math.round(PENDING_TTL_MS / 86400000) })}</p>
+						<table><thead><tr><th>{t('dom.type')}</th><th>{t('dom.name')}</th><th>{t('dom.target')}</th></tr></thead><tbody><tr><td>CNAME</td><td><code>{row.pendingDomain}</code></td><td><code>{cnameTarget()}</code></td></tr></tbody></table>
 						{state?.errors.length ? <p class="hint">{state.errors.join(' · ')}</p> : null}
 					</>
 				)}
-				<form method="post"><input type="hidden" name="action" value="remove" /><button type="submit">Disconnect domain</button></form>
+				<form method="post"><input type="hidden" name="action" value="remove" /><button type="submit">{t('dom.disconnect')}</button></form>
 			</div>
 		) : (
 			<form method="post" class="row">
 				<input type="hidden" name="action" value="add" />
-				<div class="field"><label for="host">Domain</label><input id="host" name="host" type="text" required placeholder="newsletter.example.com" /></div>
-				<button type="submit">Connect</button>
+				<div class="field"><label for="host">{t('dom.domain')}</label><input id="host" name="host" type="text" required placeholder="newsletter.example.com" /></div>
+				<button type="submit">{t('dom.connect')}</button>
 			</form>
 		)}
 	</div>

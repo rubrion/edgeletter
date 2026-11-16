@@ -3,10 +3,15 @@ import { env } from 'cloudflare:workers';
 import { loadSettings } from '../../lib/settings';
 import AdminAppbar from '../../components/AdminAppbar.astro';
 import AdminHead from '../../components/AdminHead.astro';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
 import { limitsFor } from '../../lib/plans';
 import { publicationOrigin } from '../../lib/tenant';
 
 const settings = await loadSettings(Astro.locals.publication.id);
+const lang = getLang(Astro.request);
+const t = studio(lang);
 const themeColor = settings.themePrimaryColor;
 const saved = Astro.url.searchParams.get('saved') === '1';
 const error = Astro.url.searchParams.get('error');
@@ -22,7 +27,7 @@ const turnstileEnabled =
   Boolean((env as unknown as { TURNSTILE_SECRET?: string }).TURNSTILE_SECRET);
 ---
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
 <head>
   <AdminHead title={`Widget — ${settings.clientName}`} />
   <style is:global>
@@ -64,73 +69,73 @@ const turnstileEnabled =
   <div class="wrap">
     <div class="card">
       <header class="page-head">
-        <span class="eyebrow">Out in the world</span>
-        <h1>Embeddable widget</h1>
-        <p class="sub">Configure default appearance for your blog widget. Anyone can embed it on any site using the snippet below. Per-embed overrides are passed via query string.</p>
+        <span class="eyebrow">{t('wid.eyebrow')}</span>
+        <h1>{t('wid.heading')}</h1>
+        <p class="sub">{t('wid.lead')}</p>
       </header>
 
-      {saved && <div class="alert ok">Saved.</div>}
+      {saved && <div class="alert ok">{t('common.saved')}</div>}
       {error && <div class="alert err">{error}</div>}
 
       <form method="POST" action="/api/admin/settings" id="widget-form">
         <input type="hidden" name="_redirect" value="/admin/widget" />
-        <h2>Defaults</h2>
+        <h2>{t('wid.defaults')}</h2>
         <div class="grid">
           <div class="field">
-            <label for="widgetDefaultTheme">Theme</label>
+            <label for="widgetDefaultTheme">{t('wid.theme')}</label>
             <select id="widgetDefaultTheme" name="widgetDefaultTheme">
-              <option value="auto" selected={settings.widgetDefaultTheme === 'auto'}>Auto (follow viewer)</option>
-              <option value="light" selected={settings.widgetDefaultTheme === 'light'}>Light</option>
-              <option value="dark" selected={settings.widgetDefaultTheme === 'dark'}>Dark</option>
+              <option value="auto" selected={settings.widgetDefaultTheme === 'auto'}>{t('wid.themeAuto')}</option>
+              <option value="light" selected={settings.widgetDefaultTheme === 'light'}>{t('wid.themeLight')}</option>
+              <option value="dark" selected={settings.widgetDefaultTheme === 'dark'}>{t('wid.themeDark')}</option>
             </select>
           </div>
 
           <div class="field">
-            <label for="widgetDefaultLimit">Posts shown</label>
+            <label for="widgetDefaultLimit">{t('wid.limit')}</label>
             <input type="number" min="1" max="50" id="widgetDefaultLimit" name="widgetDefaultLimit" value={settings.widgetDefaultLimit} />
           </div>
 
           <div class="field">
-            <label for="widgetMaxWidth">Max width (CSS length)</label>
+            <label for="widgetMaxWidth">{t('wid.maxWidth')}</label>
             <input type="text" id="widgetMaxWidth" name="widgetMaxWidth" value={settings.widgetMaxWidth} placeholder="e.g. 720px or 100%" />
-            <div class="hint">Leave blank to fill the iframe.</div>
+            <div class="hint">{t('wid.maxWidthHint')}</div>
           </div>
 
           <div class="field">
-            <label for="widgetAccentOverride">Accent color override</label>
+            <label for="widgetAccentOverride">{t('wid.accent')}</label>
             <div class="color-row">
               <input type="color" id="widgetAccentColor" value={settings.widgetAccentOverride || settings.themePrimaryColor} />
               <input type="text" id="widgetAccentOverride" name="widgetAccentOverride" value={settings.widgetAccentOverride} placeholder={settings.themePrimaryColor} pattern="^(#[0-9a-fA-F]{3,8})?$" />
             </div>
-            <div class="hint">Empty = inherit site primary color.</div>
+            <div class="hint">{t('wid.accentHint')}</div>
           </div>
         </div>
 
         <div class="field">
-          <label>Display options</label>
+          <label>{t('wid.display')}</label>
           <div class="checks">
             <label>
               <input type="hidden" name="widgetShowDate" value="0" />
               <input type="checkbox" id="widgetShowDate" name="widgetShowDate" value="1" checked={settings.widgetShowDate === '1'} />
-              Show post date
+              {t('wid.showDate')}
             </label>
             <label>
               <input type="hidden" name="widgetShowExcerpts" value="0" />
               <input type="checkbox" id="widgetShowExcerpts" name="widgetShowExcerpts" value="1" checked={settings.widgetShowExcerpts === '1'} />
-              Show excerpts
+              {t('wid.showExcerpts')}
             </label>
             <label>
               <input type="hidden" name="widgetHideWatermark" value="0" />
               <input type="checkbox" id="widgetHideWatermark" name="widgetHideWatermark" value="1" checked={isPro && settings.widgetHideWatermark === '1'} disabled={!isPro} />
-              Hide "Made with EdgeLetter" 
+              {t('wid.hideWm')}
             </label>
           </div>
-          <div class="hint">{isPro ? 'Shown by default; you can hide it on Pro.' : 'Hiding the watermark is part of the Pro plan.'}</div>
+          <div class="hint">{isPro ? t('wid.wmPro') : t('wid.wmFree')}</div>
         </div>
 
-        <h2>Cross-origin embeds (CORS)</h2>
+        <h2>{t('wid.cors')}</h2>
         <div class="field">
-          <label for="widgetAllowedOrigins">Allowed origins</label>
+          <label for="widgetAllowedOrigins">{t('wid.origins')}</label>
           <input type="text" id="widgetAllowedOrigins" name="widgetAllowedOrigins" value={settings.widgetAllowedOrigins} placeholder="* or https://site.com,https://other.com" />
           <div class="hint">
             Comma-separated full origins (scheme + host + optional port) that may call <code>/api/subscribe</code> and <code>/api/unsubscribe</code> from JavaScript.
@@ -139,7 +144,7 @@ const turnstileEnabled =
           </div>
         </div>
 
-        <h2>Bot protection</h2>
+        <h2>{t('wid.bot')}</h2>
         <div class="field">
           <label>Cloudflare Turnstile</label>
           {turnstileEnabled ? (
@@ -156,31 +161,31 @@ const turnstileEnabled =
         </div>
 
         <div class="actions">
-          <button type="submit">Save defaults</button>
+          <button type="submit">{t('wid.saveDefaults')}</button>
         </div>
       </form>
 
-      <h2>Embed snippet</h2>
-      <p class="sub">Paste this where you want the widget to appear. The resizer script is optional but lets the iframe auto-grow with content.</p>
+      <h2>{t('wid.snippet')}</h2>
+      <p class="sub">{t('wid.snippetLead')}</p>
 
       <div class="grid">
         <div>
           <div class="field">
-            <label for="opt-target">Click behavior</label>
+            <label for="opt-target">{t('wid.click')}</label>
             <select id="opt-target">
-              <option value="_blank" selected>Open posts in new tab (full site)</option>
-              <option value="_self">Open posts inside the widget</option>
+              <option value="_blank" selected>{t('wid.clickNew')}</option>
+              <option value="_self">{t('wid.clickSelf')}</option>
             </select>
           </div>
           <div class="field">
-            <label for="opt-font">Font</label>
+            <label for="opt-font">{t('wid.font')}</label>
             <select id="opt-font">
-              <option value="">Stationery serif (default)</option>
-              <option value="inherit">Inherit from host page</option>
+              <option value="">{t('wid.fontDefault')}</option>
+              <option value="inherit">{t('wid.fontInherit')}</option>
             </select>
           </div>
           <div class="field">
-            <label>Iframe size</label>
+            <label>{t('wid.size')}</label>
             <div class="row-2">
               <input type="text" id="opt-width" value="100%" placeholder="width" />
               <input type="text" id="opt-height" value="auto" placeholder="height (or 'auto' for resizer)" />
@@ -190,7 +195,7 @@ const turnstileEnabled =
         </div>
         <div>
           <div class="field">
-            <label>Live preview</label>
+            <label>{t('wid.preview')}</label>
             <iframe id="preview" class="preview-frame" loading="lazy"></iframe>
           </div>
         </div>
@@ -198,24 +203,24 @@ const turnstileEnabled =
 
       <div class="snippet-wrap">
         <pre class="snippet" id="snippet"></pre>
-        <button type="button" class="copy" id="copy-btn">Copy</button>
+        <button type="button" class="copy" id="copy-btn">{t('wid.copy')}</button>
       </div>
 
-      <h2>Subscribe-form snippet (cross-origin)</h2>
+      <h2>{t('wid.formSnippet')}</h2>
       <p class="sub">
         Drop this on any host site whose origin is in the allowlist above. Posts submit to <code>{publicOrigin}/api/subscribe</code> and trigger a confirmation email (double opt-in).
         {turnstileEnabled && <span> Turnstile widget is included automatically.</span>}
       </p>
       <div class="snippet-wrap">
         <pre class="snippet" id="form-snippet"></pre>
-        <button type="button" class="copy" id="copy-form-btn">Copy</button>
+        <button type="button" class="copy" id="copy-form-btn">{t('wid.copy')}</button>
       </div>
 
-      <p class="hint" style="margin-top: 0.75rem;">Origin: <code id="origin-display">{publicOrigin}</code></p>
+      <p class="hint" style="margin-top: 0.75rem;">{t('wid.origin')} <code id="origin-display">{publicOrigin}</code></p>
     </div>
   </div>
 
-  <script is:inline define:vars={{ publicOrigin, turnstileEnabled, turnstileSiteKey }}>
+  <script is:inline define:vars={{ publicOrigin, turnstileEnabled, turnstileSiteKey, copyLabel: t('wid.copy'), copiedLabel: lang === 'pt-BR' ? 'Copiado' : 'Copied' }}>
     const $ = (id) => document.getElementById(id);
 
     // Two-way bind accent picker.
@@ -318,8 +323,8 @@ const turnstileEnabled =
     function copyFromEl(textEl, btn) {
       const text = textEl.textContent || '';
       navigator.clipboard.writeText(text).then(() => {
-        btn.textContent = 'Copied';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        btn.textContent = copiedLabel;
+        setTimeout(() => { btn.textContent = copyLabel; }, 1500);
       }).catch(() => {
         const range = document.createRange();
         range.selectNodeContents(textEl);

@@ -5,6 +5,8 @@ import { campaigns, getDbInstance, posts, subscribers } from '../../db';
 import { membershipsOf } from '../../lib/auth';
 import { emailsThisMonth, limitsFor } from '../../lib/plans';
 import { publicationOrigin } from '../../lib/tenant';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
 
 const user = Astro.locals.user!;
 const publication = Astro.locals.publication;
@@ -44,53 +46,56 @@ const [[subs], [postCounts], sent, recent] = await Promise.all([
 ]);
 
 const fmt = (d: Date | number | null) =>
-	d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+	d ? new Date(d).toLocaleDateString(loc, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 const pct = (a: number, b: number) => `${Math.min(100, Math.round((a / Math.max(1, b)) * 100))}%`;
 const welcome = Astro.url.searchParams.get('welcome') === '1';
+const lang = getLang(Astro.request);
+const t = studio(lang);
+const loc = lang === 'pt-BR' ? 'pt-BR' : 'en-US';
 ---
 
-<AppLayout title="Overview" current="home">
+<AppLayout title={t('nav.overview')} current="home">
 	<header class="ov-head">
 		<div>
-			<span class="eyebrow" style="text-align:left">Your desk</span>
+			<span class="eyebrow" style="text-align:left">{t('ov.eyebrow')}</span>
 			<h1>{publication.name}</h1>
 			<a class="site-link" href={site} target="_blank" rel="noopener">{new URL(site).host} ↗</a>
 		</div>
 		<div class="ov-actions">
-			<a class="button" href="/admin">New post</a>
-			<a class="button ghost" href={site} target="_blank" rel="noopener">View site</a>
+			<a class="button" href="/admin">{t('nav.newPost')}</a>
+			<a class="button ghost" href={site} target="_blank" rel="noopener">{t('nav.viewSite')}</a>
 		</div>
 	</header>
 
-	{welcome && <div class="alert ok">Your publication is live. Write your first post, or bring existing ones in under Import.</div>}
+	{welcome && <div class="alert ok">{t('ov.welcome')}</div>}
 
 	<section class="tiles">
 		<a class="tile card" href="/admin/subscribers">
 			<span class="n">{Number(subs?.n ?? 0).toLocaleString()}</span>
-			<span class="l">Subscribers</span>
+			<span class="l">{t('ov.subscribers')}</span>
 			<span class="meter"><span style={`width:${pct(Number(subs?.n ?? 0), limits.subscribers)}`}></span></span>
-			<span class="cap">of {limits.subscribers.toLocaleString()}</span>
+			<span class="cap">{t('ov.of', { n: limits.subscribers.toLocaleString(loc) })}</span>
 		</a>
 		<a class="tile card" href="/admin">
 			<span class="n">{Number(postCounts?.published ?? 0)}</span>
-			<span class="l">Published posts</span>
-			<span class="cap">{Number(postCounts?.total ?? 0) - Number(postCounts?.published ?? 0)} draft(s)</span>
+			<span class="l">{t('ov.published')}</span>
+			<span class="cap">{t('ov.drafts', { n: Number(postCounts?.total ?? 0) - Number(postCounts?.published ?? 0) })}</span>
 		</a>
 		<a class="tile card" href="/billing">
 			<span class="n">{sent.toLocaleString()}</span>
-			<span class="l">Emails this month</span>
+			<span class="l">{t('ov.emails')}</span>
 			<span class="meter"><span style={`width:${pct(sent, limits.emailsPerMonth)}`}></span></span>
-			<span class="cap">of {limits.emailsPerMonth.toLocaleString()}{limits.probation ? ' (first week)' : ''}</span>
+			<span class="cap">{t('ov.of', { n: limits.emailsPerMonth.toLocaleString(loc) })}{limits.probation ? t('ov.firstWeek') : ''}</span>
 		</a>
 	</section>
 
 	<section class="recent card">
 		<div class="recent-head">
-			<h2>Recent posts</h2>
-			<a href="/admin" class="all">All posts →</a>
+			<h2>{t('ov.recent')}</h2>
+			<a href="/admin" class="all">{t('ov.allPosts')}</a>
 		</div>
 		{recent.length === 0 ? (
-			<p class="empty">No posts yet. <a href="/admin">Write your first one</a> or <a href="/import">import from your blog</a>.</p>
+			<p class="empty">{t('ov.empty')} <a href="/admin">{t('ov.emptyWrite')}</a> {t('ov.emptyOr')} <a href="/import">{t('ov.emptyImport')}</a>.</p>
 		) : (
 			<ul class="post-rows">
 				{recent.map((p) => (
@@ -100,12 +105,12 @@ const welcome = Astro.url.searchParams.get('welcome') === '1';
 								{p.coverUrl ? <img src={p.coverUrl} alt="" loading="lazy" referrerpolicy="no-referrer" /> : <span class="initial">{(p.title.trim()[0] ?? '✦').toUpperCase()}</span>}
 							</span>
 							<span class="meta">
-								<span class="t">{p.title || '(untitled)'}</span>
+								<span class="t">{p.title || t('ov.untitled')}</span>
 								<span class="x">{p.excerpt}</span>
 							</span>
 							<span class="status">
-								<span class="badge">{p.sentAt ? 'sent' : p.isPublished ? 'published' : 'draft'}</span>
-								<span class="d">{fmt(p.publishedAt)}{p.lang === 'pt' ? ' · PT' : ''}</span>
+								<span class="badge">{t(p.sentAt ? 'status.sent' : p.isPublished ? 'status.published' : 'status.draft')}</span>
+								<span class="d">{fmt(p.publishedAt)}{p.lang === 'pt' ? ' · PT' : ' · EN'}</span>
 							</span>
 						</a>
 					</li>

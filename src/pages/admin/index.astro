@@ -3,6 +3,7 @@ import AdminEditor from '../../components/AdminEditor.tsx';
 import AdminAppbar from '../../components/AdminAppbar.astro';
 import AdminHead from '../../components/AdminHead.astro';
 import { limitsFor } from '../../lib/plans';
+import { getLang } from '../../i18n';
 import { getDbInstance, aiUsage, campaigns, posts } from '../../db';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { loadSettings } from '../../lib/settings';
@@ -76,7 +77,7 @@ const recentSerialized = recent.map((p) => ({
 }));
 ---
 <!doctype html>
-<html lang="en">
+<html lang={getLang(Astro.request)}>
 <head>
   <AdminHead title={`Admin — ${clientName}`} />
   <style is:global>
@@ -110,7 +111,7 @@ const recentSerialized = recent.map((p) => ({
 <body style={`--theme: ${themeColor}`}>
   <AdminAppbar current="posts" />
   <div style="flex: 1; min-height: 0;">
-    <AdminEditor client:only="react" recent={recentSerialized} initialAiUsage={initialAiUsage} openId={Astro.url.searchParams.get('post')} />
+    <AdminEditor client:only="react" recent={recentSerialized} initialAiUsage={initialAiUsage} openId={Astro.url.searchParams.get('post')} lang={getLang(Astro.request)} />
   </div>
 </body>
 </html>

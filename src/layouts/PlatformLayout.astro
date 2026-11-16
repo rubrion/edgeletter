@@ -4,6 +4,9 @@ import { Font } from 'astro:assets';
 import LogoMark from '../components/LogoMark.astro';
 import Reveal from '../components/Reveal.astro';
 import { platformOrigin } from '../lib/tenant';
+import LangSwitch from '../components/LangSwitch.astro';
+import { getLang } from '../i18n';
+import { studio } from '../i18n/studio';
 
 interface Props {
 	title: string;
@@ -11,10 +14,13 @@ interface Props {
 }
 const { title, description } = Astro.props;
 const app = platformOrigin(Astro.url, 'app');
+const lang = getLang(Astro.request);
+const t = studio(lang);
+const year = new Date().getUTCFullYear();
 ---
 
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang={lang} data-theme="light">
 	<head>
 		<meta charset="utf-8" />
 		<script is:inline>
@@ -42,15 +48,17 @@ const app = platformOrigin(Astro.url, 'app');
 			<nav>
 				<a href="/" class="pf-brand"><LogoMark size={30} /><span>EdgeLetter</span></a>
 				<div class="pf-links">
-					<a class="micro" href="/explore">Explore</a>
-					<a class="micro" href="/directory">Directory</a>
-					<a class="micro bracket" href={`${app}/signin`}>Sign in</a>
+					<a class="micro" href="/explore">{t('pf.explore')}</a>
+					<a class="micro" href="/directory">{t('pf.directory')}</a>
+					<LangSwitch class="micro lang" />
+					<a class="micro bracket" href={`${app}/signin`}>{t('pf.signin')}</a>
 				</div>
 			</nav>
 		</header>
 		<slot />
 		<footer class="pf-footer pocket">
-			<span class="micro deboss">EdgeLetter ✦ Newsletters, written by hand and sent at the edge</span>
+			<span class="micro deboss">{t('pf.footer')}</span>
+			<span class="micro deboss rights"><a href="https://rubrion.ai" rel="noopener">{t('footer.rights', { year })}</a></span>
 		</footer>
 		<Reveal />
 		<style>
@@ -61,7 +69,11 @@ const app = platformOrigin(Astro.url, 'app');
 			.pf-links { display: flex; gap: 1.75rem; align-items: center; }
 			.pf-links a { color: var(--ink); text-decoration: none; }
 			.pf-links a:hover { color: var(--accent); }
-			.pf-footer { margin-top: 5rem; padding: 4.5rem 1rem 3rem; text-align: center; }
+			.pf-footer { margin-top: 5rem; padding: 4.5rem 1rem 3rem; text-align: center; display: flex; flex-direction: column; gap: 0.7rem; align-items: center; }
+			.rights a { color: inherit; text-decoration: none; }
+			.rights a:hover { text-decoration: underline; }
+			.pf-links :global(.lang) { color: var(--muted); }
+			.pf-links :global(.lang:hover) { color: var(--accent); }
 			@media (max-width: 560px) { .pf-links { gap: 1rem; } .pf-brand span { display: none; } }
 		</style>
 	</body>

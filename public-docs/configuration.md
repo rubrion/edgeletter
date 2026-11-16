@@ -19,7 +19,7 @@
 | `RESEND_API_KEY` | Sending |
 | `RESEND_WEBHOOK_SECRET` | Svix secret of the Resend webhook → `/api/webhooks/resend` (bounced, complained, opened, clicked) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in; redirect `https://app.edgeletter.blog/auth/google/callback` |
-| `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_CONFIG` | Pro plan; webhook → `/api/webhooks/stripe` (checkout.session.completed, customer.subscription.*) |
+| `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO` (monthly), `STRIPE_PRICE_PRO_YEARLY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_CONFIG` | Pro plan; webhook → `/api/webhooks/stripe` (checkout.session.completed, customer.subscription.*) |
 | `CF_API_TOKEN` | Token with *SSL and Certificates: Edit* on the platform zone (custom hostnames) |
 | `TURNSTILE_SECRET` | Enables Turnstile verification |
 
@@ -48,3 +48,14 @@ Cloudflare allocates a large custom-hostname quota but bills hostnames beyond it
 3. A daily cron (`17 4 * * *`) releases setups still pending after 7 days and any hostname held by a non-Pro publication.
 
 The staff console shows hostnames in use against the cap.
+
+## Pricing
+
+Launch pricing is R$29/month or R$290/year in BRL, with US$7/US$70 as Stripe currency options for buyers outside Brazil. Existing subscriptions keep their price when prices change later.
+
+| | Free | Pro |
+|---|---|---|
+| Subscribers | 500 | 2,500 |
+| Emails / month | 2,000 (500 in the first week) | 10,000 |
+
+Limits are sized so that a writer at the cap costs at most about the plan price in email: Resend charges roughly $0.35–0.90 per 1,000 emails.

@@ -4,6 +4,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
 import { getDbInstance, memberships, publications, reports, users } from '../../db';
 import { addMember, EMAIL_RE, findOrCreateUser, normalizeEmail } from '../../lib/auth';
 import { invalidatePublicationCache, publicationOrigin } from '../../lib/tenant';
+import { customHostnamesInUse, maxCustomHostnames, releaseHostname } from '../../lib/custom-hostnames';
 
 const db = getDbInstance();
 let notice: string | null = null;
@@ -18,6 +19,10 @@ if (Astro.request.method === 'POST') {
 		notice = action === 'suspend' ? 'Publication suspended: site shows 451, sends stop.' : 'Publication restored.';
 	} else if (action === 'plan') {
 		const plan = form.get('plan') === 'pro' ? 'pro' : 'free';
+		if (plan === 'free') {
+			const [held] = await db.select({ cfHostnameId: publications.cfHostnameId }).from(publications).where(eq(publications.id, id)).limit(1);
+			if (held?.cfHostnameId) await releaseHostname(id, held.cfHostnameId);
+		}
 		await db.update(publications).set({ plan }).where(eq(publications.id, id));
 		invalidatePublicationCache();
 		notice = `Plan set to ${plan}.`;
@@ -64,6 +69,7 @@ const open = await db
 	.orderBy(desc(reports.createdAt))
 	.limit(50);
 const fmt = (d: Date) => d.toISOString().slice(0, 10);
+const hostnamesUsed = await customHostnamesInUse();
 ---
 
 <AppLayout title="Staff" current="staff">
@@ -73,6 +79,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10);
 			<h1>Staff</h1>
 		</header>
 		{notice && <div class="alert ok">{notice}</div>}
+		<p class="muted">Custom hostnames in use: {hostnamesUsed} / {maxCustomHostnames()} (platform cap; Cloudflare bills hostnames beyond its free allowance).</p>
 
 		<h2>Open reports ({open.length})</h2>
 		{open.length === 0 ? <p class="empty">Nothing to review.</p> : (

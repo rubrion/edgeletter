@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { getDbInstance, publications } from '../../../db';
 import { retrieveSubscription, verifyStripeSignature, webhookSecret } from '../../../lib/stripe';
 import { invalidatePublicationCache } from '../../../lib/tenant';
+import { releaseHostname } from '../../../lib/custom-hostnames';
 
 type StripeObject = {
   id?: string;
@@ -42,6 +43,11 @@ export const POST: APIRoute = async ({ request }) => {
     const pubId = sub?.metadata?.publication_id ?? pubIdHint;
     const where = pubId ? eq(publications.id, pubId) : eq(publications.stripeSubscriptionId, subscriptionId);
     const pro = !!sub && ACTIVE.has(sub.status);
+    if (!pro) {
+      // Custom domains are Pro-only and billed per hostname: release on downgrade.
+      const held = await db.select({ id: publications.id, cfHostnameId: publications.cfHostnameId }).from(publications).where(where);
+      for (const h of held) if (h.cfHostnameId) await releaseHostname(h.id, h.cfHostnameId);
+    }
     await setPlan(where, {
       plan: pro ? 'pro' : 'free',
       stripeSubscriptionId: pro ? subscriptionId : null,

@@ -26,9 +26,12 @@
 		"MAIL_FROM_DOMAIN": "mail.edgeletter.blog",
 		"CUSTOM_DOMAIN_TARGET": "customers.edgeletter.blog",
 		"CF_ZONE_ID": "b7982b3858faae64fb1485148a45e60e",
+		// Platform ceiling on custom hostnames; stays inside Cloudflare's 100 free.
+		"MAX_CUSTOM_HOSTNAMES": "90",
 		"MEDIA_PUBLIC_BASE": "https://media.rubrion.ai",
 		"TURNSTILE_SITE_KEY": "0x4AAAAAADMKgjDCOeL0zVJj",
 	},
+	"triggers": { "crons": ["17 4 * * *"] },
 	// Sign-in, invites and reports: 5 attempts per key per minute.
 	"ratelimits": [
 		{ "name": "AUTH_LIMITER", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } },

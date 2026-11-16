@@ -1,5 +1,7 @@
 import { env } from 'cloudflare:workers';
-import { platformDomain } from './tenant';
+import { and, eq, isNotNull, lt, ne, or, sql } from 'drizzle-orm';
+import { getDbInstance, publications } from '../db';
+import { invalidatePublicationCache, platformDomain } from './tenant';
 
 /**
  * Cloudflare for SaaS custom hostnames on the platform zone. The writer points
@@ -8,7 +10,7 @@ import { platformDomain } from './tenant';
  * fallback-origin route.
  */
 
-type CfEnv = { CF_API_TOKEN?: string; CF_ZONE_ID?: string; CUSTOM_DOMAIN_TARGET?: string };
+type CfEnv = { CF_API_TOKEN?: string; CF_ZONE_ID?: string; CUSTOM_DOMAIN_TARGET?: string; MAX_CUSTOM_HOSTNAMES?: string };
 const cfg = () => env as unknown as CfEnv;
 
 export const customDomainsEnabled = (): boolean => !!cfg().CF_API_TOKEN && !!cfg().CF_ZONE_ID;
@@ -65,4 +67,60 @@ export const validCustomHost = (raw: string): string | null => {
   const root = platformDomain();
   if (root && (host === root || host.endsWith(`.${root}`))) return null;
   return host;
+};
+
+/**
+ * Cost guard. Cloudflare allocates a large quota but bills each custom
+ * hostname beyond the free allowance, so the platform enforces its own
+ * ceiling (default 90, inside the 100 free hostnames).
+ */
+export const maxCustomHostnames = (): number => {
+  const n = Number.parseInt(cfg().MAX_CUSTOM_HOSTNAMES ?? '', 10);
+  return Number.isFinite(n) && n >= 0 ? n : 90;
+};
+
+export const customHostnamesInUse = async (): Promise<number> => {
+  const [row] = await getDbInstance()
+    .select({ n: sql<number>`count(*)` })
+    .from(publications)
+    .where(isNotNull(publications.cfHostnameId));
+  return Number(row?.n ?? 0);
+};
+
+/** Remove a publication's hostname at Cloudflare and forget it locally. */
+export const releaseHostname = async (publicationId: string, cfHostnameId: string | null): Promise<void> => {
+  if (cfHostnameId && customDomainsEnabled()) await deleteHostname(cfHostnameId).catch(() => {});
+  await getDbInstance()
+    .update(publications)
+    .set({ customDomain: null, pendingDomain: null, cfHostnameId: null, pendingDomainSince: null })
+    .where(eq(publications.id, publicationId));
+  invalidatePublicationCache();
+};
+
+/** Setups never finished within this window are released. */
+export const PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Daily sweep (cron): release hostnames that are (a) still pending after a
+ * week, or (b) held by a publication that is no longer Pro. Keeps the
+ * billable count equal to what paying writers actually use.
+ */
+export const sweepCustomHostnames = async (): Promise<number> => {
+  const stale = await getDbInstance()
+    .select({ id: publications.id, cfHostnameId: publications.cfHostnameId })
+    .from(publications)
+    .where(
+      and(
+        isNotNull(publications.cfHostnameId),
+        or(
+          ne(publications.plan, 'pro'),
+          and(
+            sql`${publications.customDomain} IS NULL`,
+            lt(publications.pendingDomainSince, new Date(Date.now() - PENDING_TTL_MS)),
+          ),
+        ),
+      ),
+    );
+  for (const p of stale) await releaseHostname(p.id, p.cfHostnameId);
+  return stale.length;
 };

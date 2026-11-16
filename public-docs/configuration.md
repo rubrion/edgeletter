@@ -8,6 +8,7 @@
 | `MAIL_FROM_DOMAIN` | Verified Resend sending domain (`mail.edgeletter.blog`) |
 | `CUSTOM_DOMAIN_TARGET` | CNAME target writers point custom domains at (`customers.edgeletter.blog`) |
 | `CF_ZONE_ID` | Zone id of `PLATFORM_DOMAIN`, for the custom hostnames API |
+| `MAX_CUSTOM_HOSTNAMES` | Platform-wide ceiling on custom domains (default 90, inside Cloudflare's 100 free). New connections are refused at the cap |
 | `MEDIA_PUBLIC_BASE` | Public base URL of the R2 media bucket |
 | `TURNSTILE_SITE_KEY` | Turnstile site key (sign-in, subscribe, report) |
 
@@ -37,3 +38,13 @@ Every feature degrades gracefully when its secret is missing: no Google button, 
 ## Per-publication settings
 
 These are stored in the `settings` table, scoped by `publication_id`, and edited at `/admin/settings` and `/admin/widget`: name, tagline, logo, favicon, colors, About text and widget defaults. Name and discovery listing are mirrored on `publications`.
+
+## Custom domain costs
+
+Cloudflare allocates a large custom-hostname quota but bills hostnames beyond its free allowance. Three guards keep the count equal to what paying writers use:
+
+1. `MAX_CUSTOM_HOSTNAMES`: hard platform ceiling.
+2. A downgrade from Pro (Stripe webhook or staff) releases the publication's hostname immediately.
+3. A daily cron (`17 4 * * *`) releases setups still pending after 7 days and any hostname held by a non-Pro publication.
+
+The staff console shows hostnames in use against the cap.

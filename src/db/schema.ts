@@ -28,6 +28,7 @@ export const publications = sqliteTable(
     /** Custom hostname being provisioned (Cloudflare for SaaS); moves to customDomain once active. */
     pendingDomain: text('pending_domain'),
     cfHostnameId: text('cf_hostname_id'),
+    pendingDomainSince: integer('pending_domain_since', { mode: 'timestamp_ms' }),
   },
   (t) => ({
     publications_handle_unique: uniqueIndex('publications_handle_unique').on(t.handle),

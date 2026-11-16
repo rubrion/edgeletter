@@ -9,6 +9,9 @@ import { membershipsOf } from '../lib/auth';
 import { loadSettings } from '../lib/settings';
 import { publicationOrigin } from '../lib/tenant';
 import LogoMark from './LogoMark.astro';
+import LangSwitch from './LangSwitch.astro';
+import { getLang } from '../i18n';
+import { studio } from '../i18n/studio';
 
 type Key = 'home' | 'posts' | 'subscribers' | 'stats' | 'widget' | 'settings' | 'members' | 'keys' | 'import' | 'billing' | 'domain' | 'staff';
 
@@ -24,6 +27,8 @@ const themeColor = settings?.themePrimaryColor ?? '#B44A27';
 const mine = user ? await membershipsOf(user.id) : [];
 const owner = role === 'owner';
 const siteUrl = publication ? publicationOrigin(Astro.url, publication) : null;
+const t = studio(getLang(Astro.request));
+const year = new Date().getUTCFullYear();
 
 // Uniform-stroke pictograms (24-unit grid), matching the logo's language.
 const ICONS: Record<Key | 'new' | 'site' | 'out', string> = {
@@ -48,46 +53,46 @@ type Item = { key: Key; href: string; label: string };
 const groups: { title: string; items: Item[] }[] = [];
 if (publication) {
   groups.push({
-    title: 'Write',
+    title: t('nav.write'),
     items: [
-      { key: 'home', href: '/', label: 'Overview' },
-      { key: 'posts', href: '/admin', label: 'Posts' },
+      { key: 'home', href: '/', label: t('nav.overview') },
+      { key: 'posts', href: '/admin', label: t('nav.posts') },
     ],
   });
   groups.push({
-    title: 'Audience',
+    title: t('nav.audience'),
     items: [
-      { key: 'subscribers', href: '/admin/subscribers', label: 'Subscribers' },
-      { key: 'stats', href: '/admin/stats', label: 'Stats' },
-      ...(owner ? [{ key: 'import' as const, href: '/import', label: 'Import' }] : []),
+      { key: 'subscribers', href: '/admin/subscribers', label: t('nav.subscribers') },
+      { key: 'stats', href: '/admin/stats', label: t('nav.stats') },
+      ...(owner ? [{ key: 'import' as const, href: '/import', label: t('nav.import') }] : []),
     ],
   });
   if (owner) {
     groups.push({
-      title: 'Publication',
+      title: t('nav.publication'),
       items: [
-        { key: 'settings', href: '/admin/settings', label: 'Settings' },
-        { key: 'widget', href: '/admin/widget', label: 'Widget' },
-        { key: 'domain', href: '/domain', label: 'Domain' },
+        { key: 'settings', href: '/admin/settings', label: t('nav.settings') },
+        { key: 'widget', href: '/admin/widget', label: t('nav.widget') },
+        { key: 'domain', href: '/domain', label: t('nav.domain') },
       ],
     });
     groups.push({
-      title: 'Account',
+      title: t('nav.account'),
       items: [
-        { key: 'members', href: '/members', label: 'Team' },
-        { key: 'keys', href: '/keys', label: 'API keys' },
-        { key: 'billing', href: '/billing', label: 'Plan' },
+        { key: 'members', href: '/members', label: t('nav.team') },
+        { key: 'keys', href: '/keys', label: t('nav.keys') },
+        { key: 'billing', href: '/billing', label: t('nav.plan') },
       ],
     });
   }
 }
-if (user?.isStaff) groups.push({ title: 'Platform', items: [{ key: 'staff', href: '/staff', label: 'Staff' }] });
+if (user?.isStaff) groups.push({ title: t('nav.platform'), items: [{ key: 'staff', href: '/staff', label: t('nav.staff') }] });
 ---
 
 <input type="checkbox" id="app-nav-toggle" class="nav-toggle" aria-hidden="true" tabindex="-1" />
 <header class="app-topbar">
   <a href="/" class="top-brand"><LogoMark size={26} class="mark" /><span>{publication?.name ?? 'EdgeLetter'}</span></a>
-  <label for="app-nav-toggle" class="menu-btn" aria-label="Menu">
+  <label for="app-nav-toggle" class="menu-btn" aria-label={t('nav.menu')}>
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
   </label>
 </header>
@@ -100,7 +105,7 @@ if (user?.isStaff) groups.push({ title: 'Platform', items: [{ key: 'staff', href
     <div class="pub">
       {mine.length > 1 ? (
         <form method="get" action="/" class="switcher">
-          <label class="sr-only" for="pub-switch">Publication</label>
+          <label class="sr-only" for="pub-switch">{t('nav.pubSwitch')}</label>
           <select id="pub-switch" name="pub" onchange="this.form.submit()">
             {mine.map((m) => <option value={m.publication.id} selected={m.publication.id === publication.id}>{m.publication.name}</option>)}
           </select>
@@ -108,9 +113,9 @@ if (user?.isStaff) groups.push({ title: 'Platform', items: [{ key: 'staff', href
       ) : (
         <span class="pub-name">{publication.name}</span>
       )}
-      <span class="pub-meta">{role}{publication.plan === 'pro' ? ' · Pro' : ' · Free'}</span>
+      <span class="pub-meta">{role ? t(role === 'owner' ? 'role.owner' : 'role.editor') : ''} · {t(publication.plan === 'pro' ? 'plan.pro' : 'plan.free')}</span>
       <a href="/admin" class="new-post">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.new} /></svg>New post
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.new} /></svg>{t('nav.newPost')}
       </a>
     </div>
   )}
@@ -132,14 +137,16 @@ if (user?.isStaff) groups.push({ title: 'Platform', items: [{ key: 'staff', href
   <div class="foot">
     {siteUrl && (
       <a href={siteUrl} class="item" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.site} /></svg>View site
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.site} /></svg>{t('nav.viewSite')}
       </a>
     )}
-    {mine.length > 0 && <a href="/onboarding" class="item subtle">+ New publication</a>}
+    {mine.length > 0 && <a href="/onboarding" class="item subtle">{t('nav.newPublication')}</a>}
+    <LangSwitch class="item" />
     {user && <span class="who" title={user.email}>{user.email}</span>}
     <form method="post" action="/signout" class="signout-form">
-      <button type="submit" class="item signout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.out} /></svg>Sign out</button>
+      <button type="submit" class="item signout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.out} /></svg>{t('nav.signOut')}</button>
     </form>
+    <p class="rights">{t('footer.rights', { year })}</p>
   </div>
 </aside>
 
@@ -249,6 +256,9 @@ if (user?.isStaff) groups.push({ title: 'Platform', items: [{ key: 'staff', href
   .subtle { font-size: 0.85rem; color: var(--muted); }
   .who { padding: 0.55rem 0.6rem 0.2rem; font-size: 0.78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .signout-form { margin: 0; }
+  .rights { margin: 0.6rem 0.6rem 0; font-size: 0.72rem; line-height: 1.4; color: var(--muted); }
+  .foot :global(.lang-switch) { display: flex; width: 100%; gap: 0.65rem; padding: 0.5rem 0.6rem; border-left: 2px solid transparent; font-size: 0.95rem; line-height: 1.55; text-transform: none; letter-spacing: 0; color: var(--text); }
+  .foot :global(.lang-switch:hover) { background: rgba(var(--gray-light), 0.45); color: var(--ink); }
   button.signout { width: 100%; background: none; border: 0; border-left: 2px solid transparent; cursor: pointer; font: inherit; font-size: 0.95rem; text-transform: none; letter-spacing: 0; color: var(--text); }
   button.signout:hover { background: rgba(var(--gray-light), 0.45); color: #9C2F14; }
 

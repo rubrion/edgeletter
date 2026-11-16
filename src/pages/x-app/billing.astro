@@ -2,6 +2,9 @@
 import AppLayout from '../../layouts/AppLayout.astro';
 import { emailsThisMonth, formatBytes, limitsFor, mediaBytesUsed, PLAN_LIMITS, PRO_PRICE, subscriberCount } from '../../lib/plans';
 import { stripeEnabled, yearlyEnabled } from '../../lib/stripe';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
 
 const { publication } = Astro.locals as Required<App.Locals>;
 const limits = limitsFor(publication);
@@ -10,51 +13,54 @@ const [emails, subs, media] = await Promise.all([
 	subscriberCount(publication.id),
 	mediaBytesUsed(publication.id),
 ]);
+const lang = getLang(Astro.request);
+const t = studio(lang);
+const loc = lang === 'pt-BR' ? 'pt-BR' : 'en-US';
 const pct = (a: number, b: number) => `${Math.min(100, Math.round((a / Math.max(1, b)) * 100))}%`;
-const error = Astro.url.searchParams.get('error');
+const error = Astro.url.searchParams.get('error') ? t('bill.notConfigured') : null;
 const upgraded = Astro.url.searchParams.get('upgraded') === '1';
 const pro = publication.plan === 'pro';
 ---
 
-<AppLayout title="Plan" current="billing">
+<AppLayout title={t('nav.plan')} current="billing">
 	<div class="card app-card">
 		<header class="page-head">
-			<span class="eyebrow">Plain terms</span>
-			<h1>{pro ? 'Pro plan' : 'Free plan'}</h1>
-			<p class="sub">{limits.probation ? 'New publications send at most 500 emails during their first week.' : pro ? 'Thank you for supporting EdgeLetter.' : 'Upgrade when you outgrow the free limits.'}</p>
+			<span class="eyebrow">{t('bill.eyebrow')}</span>
+			<h1>{pro ? t('bill.pro') : t('bill.free')}</h1>
+			<p class="sub">{limits.probation ? t('bill.probation') : pro ? t('bill.thanks') : t('bill.upgradeLead')}</p>
 		</header>
-		{upgraded && !pro && <div class="alert ok">Payment received — your plan updates in a few seconds. Refresh shortly.</div>}
+		{upgraded && !pro && <div class="alert ok">{t('bill.paid')}</div>}
 		{error && <div class="alert err">{error}</div>}
 
-		<h2>This month</h2>
+		<h2>{t('bill.month')}</h2>
 		<div class="stack">
-			<div><div class="row" style="justify-content:space-between"><span>Emails sent</span><span>{emails.toLocaleString()} / {limits.emailsPerMonth.toLocaleString()}</span></div><div class="meter"><span style={`width:${pct(emails, limits.emailsPerMonth)}`}></span></div></div>
-			<div><div class="row" style="justify-content:space-between"><span>Subscribers</span><span>{subs.toLocaleString()} / {limits.subscribers.toLocaleString()}</span></div><div class="meter"><span style={`width:${pct(subs, limits.subscribers)}`}></span></div></div>
-			<div><div class="row" style="justify-content:space-between"><span>Media</span><span>{formatBytes(media)} / {formatBytes(limits.mediaBytes)}</span></div><div class="meter"><span style={`width:${pct(media, limits.mediaBytes)}`}></span></div></div>
+			<div><div class="row" style="justify-content:space-between"><span>{t('bill.emailsSent')}</span><span>{emails.toLocaleString(loc)} / {limits.emailsPerMonth.toLocaleString(loc)}</span></div><div class="meter"><span style={`width:${pct(emails, limits.emailsPerMonth)}`}></span></div></div>
+			<div><div class="row" style="justify-content:space-between"><span>{t('bill.subscribers')}</span><span>{subs.toLocaleString(loc)} / {limits.subscribers.toLocaleString(loc)}</span></div><div class="meter"><span style={`width:${pct(subs, limits.subscribers)}`}></span></div></div>
+			<div><div class="row" style="justify-content:space-between"><span>{t('bill.media')}</span><span>{formatBytes(media)} / {formatBytes(limits.mediaBytes)}</span></div><div class="meter"><span style={`width:${pct(media, limits.mediaBytes)}`}></span></div></div>
 		</div>
 
-		<h2>{pro ? 'Manage' : 'Pro includes'}</h2>
+		<h2>{pro ? t('bill.manage') : t('bill.includes')}</h2>
 		{pro ? (
-			<form method="post" action="/api/billing/portal"><button type="submit">Manage billing</button></form>
+			<form method="post" action="/api/billing/portal"><button type="submit">{t('bill.manageBilling')}</button></form>
 		) : (
 			<>
 				<dl class="kv">
-					<dt>Subscribers</dt><dd>{PLAN_LIMITS.pro.subscribers.toLocaleString()}</dd>
-					<dt>Emails</dt><dd>{PLAN_LIMITS.pro.emailsPerMonth.toLocaleString()} a month</dd>
-					<dt>Media</dt><dd>{formatBytes(PLAN_LIMITS.pro.mediaBytes)}</dd>
-					<dt>Domain</dt><dd>Your own domain</dd>
-					<dt>Branding</dt><dd>No EdgeLetter watermark</dd>
+					<dt>{t('bill.kvSubscribers')}</dt><dd>{PLAN_LIMITS.pro.subscribers.toLocaleString(loc)}</dd>
+					<dt>{t('bill.kvEmails')}</dt><dd>{t('bill.kvEmailsVal', { n: PLAN_LIMITS.pro.emailsPerMonth.toLocaleString(loc) })}</dd>
+					<dt>{t('bill.kvMedia')}</dt><dd>{formatBytes(PLAN_LIMITS.pro.mediaBytes)}</dd>
+					<dt>{t('bill.kvDomain')}</dt><dd>{t('bill.kvDomainVal')}</dd>
+					<dt>{t('bill.kvBranding')}</dt><dd>{t('bill.kvBrandingVal')}</dd>
 				</dl>
-				<p style="margin:1.5rem 0 0.25rem"><strong>{PRO_PRICE.monthly.brl}/month</strong> <span class="muted">({PRO_PRICE.monthly.usd} outside Brazil) · launch price, kept for as long as you stay subscribed</span></p>
+				<p style="margin:1.5rem 0 0.25rem"><strong>{t('bill.price', { brl: PRO_PRICE.monthly.brl })}</strong> <span class="muted">{t('bill.priceNote', { usd: PRO_PRICE.monthly.usd })}</span></p>
 				<div class="row" style="margin-top:1rem">
 					<form method="post" action="/api/billing/checkout" class="inline-form">
 						<input type="hidden" name="interval" value="month" />
-						<button type="submit" disabled={!stripeEnabled()}>{stripeEnabled() ? 'Upgrade — monthly' : 'Upgrades open soon'}</button>
+						<button type="submit" disabled={!stripeEnabled()}>{stripeEnabled() ? t('bill.monthly') : t('bill.soon')}</button>
 					</form>
 					{yearlyEnabled() && (
 						<form method="post" action="/api/billing/checkout" class="inline-form">
 							<input type="hidden" name="interval" value="year" />
-							<button type="submit">Yearly — {PRO_PRICE.yearly.brl} ({PRO_PRICE.yearly.usd}), 2 months free</button>
+							<button type="submit">{t('bill.yearly', { brl: PRO_PRICE.yearly.brl, usd: PRO_PRICE.yearly.usd })}</button>
 						</form>
 					)}
 				</div>

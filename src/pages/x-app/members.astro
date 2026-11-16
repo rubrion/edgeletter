@@ -5,8 +5,12 @@ import { getDbInstance, loginTokens, memberships, users } from '../../db';
 import { EMAIL_RE, issueLoginToken, normalizeEmail } from '../../lib/auth';
 import { sendInvite } from '../../lib/auth-email';
 import { allow } from '../../lib/ratelimit';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
 
 const { user, publication } = Astro.locals as Required<App.Locals>;
+const t = studio(getLang(Astro.request));
 const db = getDbInstance();
 let error: string | null = null;
 let notice: string | null = null;
@@ -17,15 +21,15 @@ if (Astro.request.method === 'POST') {
 	if (action === 'invite') {
 		const email = normalizeEmail(String(form.get('email') ?? ''));
 		const role = form.get('role') === 'owner' ? 'owner' : 'editor';
-		if (!EMAIL_RE.test(email)) error = 'Enter a valid email address.';
-		else if (!(await allow(`invite:${publication.id}`))) error = 'Too many invitations at once. Try again in a minute.';
+		if (!EMAIL_RE.test(email)) error = t('signin.errEmail');
+		else if (!(await allow(`invite:${publication.id}`))) error = t('team.errInviteRate');
 		else {
 			const token = await issueLoginToken({ email, purpose: 'invite', publicationId: publication.id, role });
 			try {
-				await sendInvite(email, `${Astro.url.origin}/auth/verify?token=${token}`, publication.name, user.name ?? user.email);
-				notice = `Invitation sent to ${email}.`;
+				await sendInvite(email, `${Astro.url.origin}/auth/verify?token=${token}`, publication.name, user.name ?? user.email, getLang(Astro.request));
+				notice = t('team.sent', { email });
 			} catch {
-				error = 'Could not send the invitation email.';
+				error = t('team.errSend');
 			}
 		}
 	} else if (action === 'remove') {
@@ -34,10 +38,10 @@ if (Astro.request.method === 'POST') {
 			.select({ id: memberships.userId })
 			.from(memberships)
 			.where(and(eq(memberships.publicationId, publication.id), eq(memberships.role, 'owner')));
-		if (owners.length === 1 && owners[0]!.id === target) error = 'A publication needs at least one owner.';
+		if (owners.length === 1 && owners[0]!.id === target) error = t('team.lastOwner');
 		else {
 			await db.delete(memberships).where(and(eq(memberships.publicationId, publication.id), eq(memberships.userId, target)));
-			notice = 'Member removed.';
+			notice = t('team.removed');
 		}
 	}
 }
@@ -60,29 +64,29 @@ const pending = await db
 	);
 ---
 
-<AppLayout title="Team" current="members">
+<AppLayout title={t('nav.team')} current="members">
 	<div class="card app-card">
 		<header class="page-head">
-			<span class="eyebrow">Many hands</span>
-			<h1>Team</h1>
-			<p class="sub">Editors write, publish and see subscribers. Owners also manage settings, plan, domain, keys and the team.</p>
+			<span class="eyebrow">{t('team.eyebrow')}</span>
+			<h1>{t('nav.team')}</h1>
+			<p class="sub">{t('team.lead')}</p>
 		</header>
 		{notice && <div class="alert ok">{notice}</div>}
 		{error && <div class="alert err">{error}</div>}
 
-		<h2>Members</h2>
+		<h2>{t('team.members')}</h2>
 		<table>
-			<thead><tr><th>Person</th><th>Role</th><th></th></tr></thead>
+			<thead><tr><th>{t('team.person')}</th><th>{t('team.role')}</th><th></th></tr></thead>
 			<tbody>
 				{team.map((m) => (
 					<tr>
-						<td>{m.name ? <>{m.name} <span class="muted">{m.email}</span></> : m.email}{m.id === user.id && <span class="muted"> (you)</span>}</td>
-						<td><span class="badge">{m.role}</span></td>
+						<td>{m.name ? <>{m.name} <span class="muted">{m.email}</span></> : m.email}{m.id === user.id && <span class="muted"> {t('team.you')}</span>}</td>
+						<td><span class="badge">{t(m.role === 'owner' ? 'role.owner' : 'role.editor')}</span></td>
 						<td style="text-align:right">
 							<form method="post" class="inline-form">
 								<input type="hidden" name="action" value="remove" />
 								<input type="hidden" name="user" value={m.id} />
-								<button type="submit" class="btn-link" style="background:none;color:var(--accent);border:0;padding:0;letter-spacing:0;text-transform:none;font-size:0.9rem">Remove</button>
+								<button type="submit" class="btn-link" style="background:none;color:var(--accent);border:0;padding:0;letter-spacing:0;text-transform:none;font-size:0.9rem">{t('common.remove')}</button>
 							</form>
 						</td>
 					</tr>
@@ -90,21 +94,21 @@ const pending = await db
 			</tbody>
 		</table>
 		{pending.length > 0 && (
-			<p class="muted" style="margin-top:1rem">Pending: {pending.map((p) => `${p.email} (${p.role})`).join(', ')}</p>
+			<p class="muted" style="margin-top:1rem">{t('team.pending')} {pending.map((p) => `${p.email} (${t(p.role === 'owner' ? 'role.owner' : 'role.editor')})`).join(', ')}</p>
 		)}
 
-		<h2>Invite</h2>
+		<h2>{t('team.invite')}</h2>
 		<form method="post" class="row">
 			<input type="hidden" name="action" value="invite" />
 			<div class="field">
-				<label for="email">Email</label>
-				<input id="email" name="email" type="email" required placeholder="colleague@example.com" />
+				<label for="email">{t('team.email')}</label>
+				<input id="email" name="email" type="email" required placeholder={t('team.emailPh')} />
 			</div>
 			<div class="field" style="flex:0 0 160px;min-width:140px">
-				<label for="role">Role</label>
-				<select id="role" name="role"><option value="editor">Editor</option><option value="owner">Owner</option></select>
+				<label for="role">{t('team.role')}</label>
+				<select id="role" name="role"><option value="editor">{t('team.editor')}</option><option value="owner">{t('team.owner')}</option></select>
 			</div>
-			<button type="submit">Send invite</button>
+			<button type="submit">{t('team.send')}</button>
 		</form>
 	</div>
 </AppLayout>

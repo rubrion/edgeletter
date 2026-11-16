@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
 import { sanitizeHtml } from '../lib/sanitize';
+import type { Lang } from '../i18n';
+import { studio } from '../i18n/studio';
 
 type UploadResult = { url: string; key: string; kind: 'image' | 'video'; size: number };
 
@@ -46,6 +48,7 @@ type Props = {
   initialAiUsage: AiUsage | null;
   /** Post to open on load (from /admin?post=<id>); otherwise a blank draft. */
   openId?: string | null;
+  lang?: Lang;
 };
 
 type Draft = {
@@ -73,9 +76,9 @@ const blank: Draft = {
   lastSentAt: null,
 };
 
-const formatSentAt = (iso: string): string => {
+const formatSentAt = (iso: string, locale?: string): string => {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -94,7 +97,9 @@ const toDraft = (p: RecentPost): Draft => ({
   lastSentAt: p.lastSentAt,
 });
 
-export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
+export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en' }: Props) {
+  const t = studio(lang);
+  const loc = lang === 'pt-BR' ? 'pt-BR' : 'en-US';
   const [posts, setPosts] = useState<RecentPost[]>(recent);
   const opened = openId ? recent.find((p) => p.id === openId) : undefined;
   const [draft, setDraft] = useState<Draft>(opened ? toDraft(opened) : blank);
@@ -133,11 +138,11 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
   const handleFiles = async (files: FileList | File[]) => {
     const list = Array.from(files).filter((f) => ACCEPTED_MIME.has(f.type));
     if (list.length === 0) {
-      setMessage('No supported files (jpg, png, webp, gif, mp4, webm).');
+      setMessage(t('ed.msgUnsupported'));
       return;
     }
     setBusy('uploading');
-    setMessage(`Uploading ${list.length} file${list.length === 1 ? '' : 's'}…`);
+    setMessage(`${t('ed.uploading')} (${list.length})`);
     let okCount = 0;
     let failMsg: string | null = null;
     for (const f of list) {
@@ -152,8 +157,8 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
     setBusy('idle');
     setMessage(
       failMsg
-        ? `Uploaded ${okCount}/${list.length}. Last error: ${failMsg}`
-        : `Uploaded ${okCount} file${okCount === 1 ? '' : 's'}.`,
+        ? `${okCount}/${list.length} ✓ — ${failMsg}`
+        : `${okCount} ✓`,
     );
   };
 
@@ -192,7 +197,7 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
 
   const submit = async (publish: boolean) => {
     if (!draft.title.trim() || !draft.contentMd.trim()) {
-      setMessage('Title and content required.');
+      setMessage(t('ed.msgRequired'));
       return;
     }
     setBusy(publish ? 'publishing' : 'saving');
@@ -253,19 +258,18 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
       setPosts((curr) => [updatedPost, ...curr.filter((x) => x.id !== updatedPost.id)]);
 
       if (json.alreadySent) {
-        setMessage('Updated. Email was already delivered earlier — not re-sending.');
+        setMessage(t('ed.msgAlreadySent'));
       } else if (json.dispatch) {
         const d = json.dispatch;
-        const plural = (n: number) => `${n} subscriber${n === 1 ? '' : 's'}`;
         setMessage(
           d.queued
-            ? `Queued for ${plural(d.recipients)} — sending in the background.`
-            : `Sent to ${plural(d.sent)}${d.failed ? `, ${d.failed} failed` : ''}.`,
+            ? t('ed.msgQueued', { n: d.recipients })
+            : t('ed.msgSentTo', { n: d.sent }) + (d.failed ? t('ed.msgFailed', { n: d.failed }) : ''),
         );
       } else if (publish) {
-        setMessage('Published.');
+        setMessage(t('ed.msgPublished'));
       } else {
-        setMessage(isExisting ? 'Updated.' : 'Saved as draft.');
+        setMessage(isExisting ? t('ed.msgUpdated') : t('ed.msgDraft'));
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'unknown error');
@@ -292,12 +296,12 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
 
   const handleAiReview = async () => {
     if (!draft.contentMd.trim()) {
-      setMessage('Nothing to review — write some content first.');
+      setMessage(t('ed.msgNothing'));
       return;
     }
     const snapshot = draft.contentMd;
     setBusy('reviewing');
-    setMessage('Reviewing with AI…');
+    setMessage(t('ed.msgReviewing'));
     setUndoStack((s) => [...s, snapshot]);
     setRedoStack([]);
     try {
@@ -322,10 +326,10 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
         return;
       }
       setDraft((d) => ({ ...d, contentMd: j.contentMd! }));
-      setMessage('Content updated by AI. Use Undo to revert.');
+      setMessage(t('ed.msgAiDone'));
     } catch (err) {
       setUndoStack((s) => s.slice(0, -1));
-      setMessage(err instanceof Error ? err.message : 'AI review error');
+      setMessage(err instanceof Error ? err.message : t('ed.msgAiError'));
     } finally {
       setBusy('idle');
     }
@@ -333,9 +337,7 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
 
   const handleDelete = async () => {
     if (!draft.id) return;
-    const ok = window.confirm(
-      `Delete "${draft.title || 'untitled'}"? This cannot be undone.`,
-    );
+    const ok = window.confirm(`${draft.title || t('ed.untitled')}\n\n${t('ed.confirmDelete')}`);
     if (!ok) return;
     setBusy('deleting');
     setMessage(null);
@@ -353,7 +355,7 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
       setPosts((curr) => curr.filter((p) => p.id !== deletedId));
       setDraft(blank);
       setSlugDirty(false);
-      setMessage('Deleted.');
+      setMessage(t('ed.msgDeleted'));
     } finally {
       setBusy('idle');
     }
@@ -363,11 +365,11 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
     <div style={styles.shell}>
       <aside style={styles.sidebar}>
         <button onClick={newPost} style={styles.newBtn}>
-          New post
+          {t('nav.newPost')}
         </button>
-        <span style={styles.sidebarLabel}>Manuscripts</span>
+        <span style={styles.sidebarLabel}>{t('ed.manuscripts')}</span>
         <div style={styles.list} className="ed-list">
-          {posts.length === 0 && <p style={styles.muted}>No posts yet.</p>}
+          {posts.length === 0 && <p style={styles.muted}>{t('ed.noPosts')}</p>}
           {posts.map((p) => (
             <button
               key={p.id}
@@ -377,13 +379,13 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
                 ...(draft.id === p.id ? styles.listItemActive : null),
               }}
             >
-              <span style={styles.listTitle}>{p.title || '(untitled)'}</span>
+              <span style={styles.listTitle}>{p.title || t('ed.untitled')}</span>
               <span style={styles.listMeta}>
                 {p.lastSentAt
-                  ? `[ Sent · ${formatSentAt(p.lastSentAt)} ]`
+                  ? `[ ${t('ed.sent', { d: formatSentAt(p.lastSentAt, loc) })} ]`
                   : p.isPublished
-                    ? '[ Published ]'
-                    : '[ Draft ]'}
+                    ? `[ ${t('ed.published')} ]`
+                    : `[ ${t('ed.draft')} ]`}
               </span>
             </button>
           ))}
@@ -393,7 +395,7 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
         <div style={styles.fields}>
           <input
             type="text"
-            placeholder="Post title"
+            placeholder={t('ed.titlePh')}
             value={draft.title}
             onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
             style={styles.titleInput}
@@ -415,18 +417,18 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
             onClick={handleUndo}
             disabled={busy !== 'idle' || undoStack.length === 0}
             style={styles.toolBtn}
-            title="Undo AI review"
+            title={t('ed.undoTitle')}
           >
-            ↩ Undo
+            {t('ed.undo')}
           </button>
           <button
             type="button"
             onClick={handleRedo}
             disabled={busy !== 'idle' || redoStack.length === 0}
             style={styles.toolBtn}
-            title="Redo AI review"
+            title={t('ed.redoTitle')}
           >
-            ↪ Redo
+            {t('ed.redo')}
           </button>
           <span style={styles.toolDivider} />
           <button
@@ -435,7 +437,7 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
             disabled={busy === 'uploading'}
             style={styles.toolBtn}
           >
-            {busy === 'uploading' ? 'Uploading…' : '+ Image / video'}
+            {busy === 'uploading' ? t('ed.uploading') : t('ed.upload')}
           </button>
           <input
             ref={fileInputRef}
@@ -458,14 +460,14 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
               ? { ...styles.toolBtn, ...styles.toolBtnAi, opacity: 0.7 }
               : { ...styles.toolBtn, ...styles.toolBtnAi }}
           >
-            {busy === 'reviewing' ? 'Reviewing…' : '✦ Review with AI'}
+            {busy === 'reviewing' ? t('ed.reviewing') : t('ed.review')}
           </button>
-          <span style={styles.toolHint}>drag-drop or paste files into the editor</span>
+          <span style={styles.toolHint}>{t('ed.dropHint')}</span>
         </div>
         <div style={styles.split}>
           <textarea
             ref={textareaRef}
-            placeholder="Write in markdown…"
+            placeholder={t('ed.bodyPh')}
             value={draft.contentMd}
             onChange={(e) => setDraft((d) => ({ ...d, contentMd: e.target.value }))}
             onDragOver={(e) => {
@@ -506,12 +508,12 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
               }}
               title={`${aiUsage.used.toLocaleString()} of ${aiUsage.limit.toLocaleString()} AI review tokens used today`}
             >
-              ✦ {aiUsage.used.toLocaleString()} / {aiUsage.limit.toLocaleString()} tokens
+              ✦ {t('ed.tokens', { used: aiUsage.used.toLocaleString(loc), limit: aiUsage.limit.toLocaleString(loc) })}
             </span>
           )}
           {message && <span style={styles.message}>{message}</span>}
           {wasSent && draft.lastSentAt && (
-            <span style={styles.sentBadge}>[ Sent · {formatSentAt(draft.lastSentAt)} ]</span>
+            <span style={styles.sentBadge}>[ {t('ed.sentBadge', { d: formatSentAt(draft.lastSentAt, loc) })} ]</span>
           )}
           <div style={{ flex: 1 }} />
           {isExisting && (
@@ -520,7 +522,7 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
               disabled={busy !== 'idle'}
               style={styles.btnDanger}
             >
-              {busy === 'deleting' ? 'Deleting…' : 'Delete'}
+              {busy === 'deleting' ? t('ed.deleting') : t('ed.delete')}
             </button>
           )}
           <button
@@ -529,10 +531,10 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
             style={styles.btnSecondary}
           >
             {busy === 'saving'
-              ? 'Saving…'
+              ? t('ed.saving')
               : isExisting
-                ? 'Update post'
-                : 'Save draft'}
+                ? t('ed.update')
+                : t('ed.saveDraft')}
           </button>
           {!wasSent && (
             <button
@@ -540,7 +542,7 @@ export default function AdminEditor({ recent, initialAiUsage, openId }: Props) {
               disabled={busy !== 'idle'}
               style={styles.btnPrimary}
             >
-              {busy === 'publishing' ? 'Publishing…' : 'Publish + Send'}
+              {busy === 'publishing' ? t('ed.publishing') : t('ed.publish')}
             </button>
           )}
         </div>

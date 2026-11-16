@@ -5,7 +5,7 @@ import { getDbInstance, oauthAccounts, users } from '../../../../db';
 import { findOrCreateUser, startSession } from '../../../../lib/auth';
 import { finishGoogle } from '../../../../lib/google';
 
-const fail = (msg: string) => '/signin?error=' + encodeURIComponent(msg);
+const fail = (code: 'google' | 'interrupted') => `/signin?error=${code}`;
 
 export const GET: APIRoute = async ({ url, cookies, redirect, request }) => {
   const raw = cookies.get('el_oauth')?.value;
@@ -18,7 +18,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect, request }) => {
   }
   const code = url.searchParams.get('code');
   if (!code || !saved.state || saved.state !== url.searchParams.get('state') || !saved.verifier) {
-    return redirect(fail('Google sign-in was interrupted. Please try again.'), 302);
+    return redirect(fail('interrupted'), 302);
   }
 
   let profile;
@@ -26,7 +26,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect, request }) => {
     profile = await finishGoogle(code, saved.verifier, `${url.origin}/auth/google/callback`);
   } catch (err) {
     console.error('google sign-in failed', err);
-    return redirect(fail('Google sign-in failed. Please try again.'), 302);
+    return redirect(fail('google'), 302);
   }
 
   const db = getDbInstance();

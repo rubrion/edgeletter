@@ -4,8 +4,12 @@ import AppLayout from '../../layouts/AppLayout.astro';
 import { apiKeys, getDbInstance } from '../../db';
 import { createApiKey, type ApiScope } from '../../lib/auth';
 import { publicationOrigin } from '../../lib/tenant';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
 
 const { publication } = Astro.locals as Required<App.Locals>;
+const t = studio(getLang(Astro.request));
 const db = getDbInstance();
 let created: { key: string; scope: ApiScope } | null = null;
 
@@ -32,36 +36,36 @@ const origin = publicationOrigin(Astro.url, publication);
 const fmt = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '—');
 ---
 
-<AppLayout title="API keys" current="keys">
+<AppLayout title={t('nav.keys')} current="keys">
 	<div class="card app-card">
 		<header class="page-head">
-			<span class="eyebrow">Machine to machine</span>
-			<h1>API keys</h1>
-			<p class="sub">Let your own site publish posts or subscribe readers on your behalf.</p>
+			<span class="eyebrow">{t('keys.eyebrow')}</span>
+			<h1>{t('nav.keys')}</h1>
+			<p class="sub">{t('keys.lead')}</p>
 		</header>
 
 		{created && (
 			<div class="stack" style="margin-bottom:1.5rem">
-				<div class="alert ok">New {created.scope} key — copy it now, it won't be shown again.</div>
+				<div class="alert ok">{t('keys.created', { scope: t(created.scope === 'publish' ? 'keys.publish' : 'keys.subscribe') })}</div>
 				<div class="secret">{created.key}</div>
 			</div>
 		)}
 
-		<h2>Active keys</h2>
-		{keys.length === 0 ? <p class="empty">No keys yet.</p> : (
+		<h2>{t('keys.active')}</h2>
+		{keys.length === 0 ? <p class="empty">{t('keys.none')}</p> : (
 			<table>
-				<thead><tr><th>Key</th><th>Scope</th><th>Label</th><th>Last used</th><th></th></tr></thead>
+				<thead><tr><th>{t('keys.key')}</th><th>{t('keys.scope')}</th><th>{t('keys.label')}</th><th>{t('keys.lastUsed')}</th><th></th></tr></thead>
 				<tbody>
 					{keys.map((k) => (
 						<tr>
 							<td><code>{k.prefix}…</code></td>
-							<td><span class="badge">{k.scope}</span></td>
+							<td><span class="badge">{t(k.scope === 'publish' ? 'keys.publish' : 'keys.subscribe')}</span></td>
 							<td>{k.label ?? <span class="muted">—</span>}</td>
 							<td>{fmt(k.lastUsedAt)}</td>
 							<td style="text-align:right">
 								<form method="post" class="inline-form">
 									<input type="hidden" name="action" value="revoke" /><input type="hidden" name="id" value={k.id} />
-									<button type="submit" style="background:none;color:var(--accent);border:0;padding:0;letter-spacing:0;text-transform:none;font-size:0.9rem">Revoke</button>
+									<button type="submit" style="background:none;color:var(--accent);border:0;padding:0;letter-spacing:0;text-transform:none;font-size:0.9rem">{t('keys.revoke')}</button>
 								</form>
 							</td>
 						</tr>
@@ -70,22 +74,22 @@ const fmt = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '—');
 			</table>
 		)}
 
-		<h2>New key</h2>
+		<h2>{t('keys.new')}</h2>
 		<form method="post" class="row">
 			<input type="hidden" name="action" value="create" />
 			<div class="field" style="flex:0 0 170px;min-width:150px">
-				<label for="scope">Scope</label>
-				<select id="scope" name="scope"><option value="publish">Publish</option><option value="subscribe">Subscribe</option></select>
+				<label for="scope">{t('keys.scope')}</label>
+				<select id="scope" name="scope"><option value="publish">{t('keys.publish')}</option><option value="subscribe">{t('keys.subscribe')}</option></select>
 			</div>
 			<div class="field">
-				<label for="label">Label</label>
-				<input id="label" name="label" type="text" maxlength="60" placeholder="e.g. company website" />
+				<label for="label">{t('keys.label')}</label>
+				<input id="label" name="label" type="text" maxlength="60" placeholder={t('keys.labelPh')} />
 			</div>
-			<button type="submit">Create key</button>
+			<button type="submit">{t('keys.create')}</button>
 		</form>
 
-		<h2>Usage</h2>
-		<p class="hint" style="font-size:0.9rem">Publish: <code>POST {origin}/api/publish</code> with <code>Authorization: Bearer &lt;key&gt;</code> and JSON <code>{'{'} title, slug, content_md, publish, send?, lang?, canonical_url?, published_at? {'}'}</code>.</p>
-		<p class="hint" style="font-size:0.9rem">Subscribe: <code>POST {origin}/api/subscribe</code> with header <code>x-subscribe-key: &lt;key&gt;</code> and JSON <code>{'{'} email, lang? {'}'}</code> (skips the captcha; double opt-in still applies).</p>
+		<h2>{t('keys.usage')}</h2>
+		<p class="hint" style="font-size:0.9rem" set:html={t('keys.usagePublish', { req: `<code>POST ${origin}/api/publish</code>`, auth: '<code>Authorization: Bearer &lt;key&gt;</code>', body: '<code>{ title, slug, content_md, publish, send?, lang?, canonical_url?, published_at? }</code>' })} />
+		<p class="hint" style="font-size:0.9rem" set:html={t('keys.usageSubscribe', { req: `<code>POST ${origin}/api/subscribe</code>`, auth: '<code>x-subscribe-key: &lt;key&gt;</code>', body: '<code>{ email, lang? }</code>' })} />
 	</div>
 </AppLayout>

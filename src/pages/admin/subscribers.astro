@@ -4,6 +4,9 @@ import { getDbInstance, subscribers } from '../../db';
 import { loadSettings } from '../../lib/settings';
 import AdminAppbar from '../../components/AdminAppbar.astro';
 import AdminHead from '../../components/AdminHead.astro';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
 
 const settings = await loadSettings(Astro.locals.publication.id);
 const themeColor = settings.themePrimaryColor;
@@ -17,17 +20,19 @@ const rows = await db
 
 const saved = Astro.url.searchParams.get('saved') === '1';
 const error = Astro.url.searchParams.get('error');
+const lang = getLang(Astro.request);
+const t = studio(lang);
 const imported = Astro.url.searchParams.get('imported');
 const skippedN = Astro.url.searchParams.get('skipped');
 const capped = Astro.url.searchParams.get('capped') === '1';
 
 const fmt = (d: Date | number): string => {
   const date = typeof d === 'number' ? new Date(d) : d;
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(lang === 'pt-BR' ? 'pt-BR' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 ---
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
 <head>
   <AdminHead title={`Subscribers — ${settings.clientName}`} />
   <style is:global>
@@ -59,46 +64,46 @@ const fmt = (d: Date | number): string => {
   <div class="wrap">
     <div class="card">
       <header class="page-head">
-        <span class="eyebrow">The mailing list</span>
-        <h1>Subscribers</h1>
-        <p class="sub">Manage who receives published posts. People who unsubscribed can only re-subscribe themselves.</p>
+        <span class="eyebrow">{t('sub.eyebrow')}</span>
+        <h1>{t('nav.subscribers')}</h1>
+        <p class="sub">{t('sub.lead')}</p>
       </header>
 
-      {saved && <div class="alert ok">Saved.</div>}
+      {saved && <div class="alert ok">{t('common.saved')}</div>}
       {error && <div class="alert err">{error}</div>}
 
-      <h2>Add subscriber</h2>
+      <h2>{t('sub.add')}</h2>
       <form method="POST" action="/api/admin/subscribers" class="add-row">
         <input type="email" name="email" placeholder="someone@example.com" required autocomplete="off" />
-        <button type="submit">Add</button>
+        <button type="submit">{t('sub.addBtn')}</button>
       </form>
 
-      <h2>Import &amp; export</h2>
+      <h2>{t('sub.io')}</h2>
       {imported !== null && (
         <div class:list={['alert', capped ? 'err' : 'ok']}>
-          Imported {imported}, skipped {skippedN} (already on the list, suppressed, duplicate or invalid){capped && ' — stopped at your plan’s subscriber limit'}.
+          {t('sub.imported', { n: imported, s: skippedN ?? '0' })}{capped && t('sub.capped')}
         </div>
       )}
       <form method="POST" action="/api/admin/subscribers/import" enctype="multipart/form-data" class="import-form">
         <input type="file" name="file" accept=".csv,text/csv" required />
-        <label class="consent"><input type="checkbox" name="consent" value="1" required /> Everyone on this list agreed to receive my emails.</label>
+        <label class="consent"><input type="checkbox" name="consent" value="1" required /> {t('sub.consent')}</label>
         <div class="io-actions">
-          <button type="submit">Import CSV</button>
-          <a class="button secondary-btn" href="/api/admin/subscribers/export">Export CSV</a>
+          <button type="submit">{t('sub.importCsv')}</button>
+          <a class="button secondary-btn" href="/api/admin/subscribers/export">{t('sub.exportCsv')}</a>
         </div>
       </form>
 
-      <h2>All subscribers ({rows.length})</h2>
+      <h2>{t('sub.all', { n: rows.length })}</h2>
       {rows.length === 0 ? (
-        <div class="empty">No subscribers yet.</div>
+        <div class="empty">{t('sub.none')}</div>
       ) : (
         <div class="table-scroll"><table>
           <thead>
             <tr>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Language</th>
-              <th>Joined</th>
+              <th>{t('sub.email')}</th>
+              <th>{t('sub.status')}</th>
+              <th>{t('sub.language')}</th>
+              <th>{t('sub.joined')}</th>
               <th></th>
             </tr>
           </thead>
@@ -108,18 +113,18 @@ const fmt = (d: Date | number): string => {
               return (
                 <tr>
                   <td class="email">{s.email}</td>
-                  <td><span class={`badge ${s.status}`}>{s.status}</span></td>
+                  <td><span class={`badge ${s.status}`}>{t(`sub.st.${s.status}` as 'sub.st.active')}</span></td>
                   <td>{s.lang.toUpperCase()}</td>
                   <td>{fmt(s.createdAt)}</td>
                   <td class="actions">
                     {canUnsubscribe && (
                       <form method="POST" action={`/api/admin/subscribers/${s.id}/status`}>
                         <input type="hidden" name="status" value="unsubscribed" />
-                        <button type="submit">Unsubscribe</button>
+                        <button type="submit">{t('sub.unsubscribe')}</button>
                       </form>
                     )}
                     <form method="POST" action={`/api/admin/subscribers/${s.id}/delete`} class="delete-form">
-                      <button type="submit" class="danger">Delete</button>
+                      <button type="submit" class="danger">{t('sub.delete')}</button>
                     </form>
                   </td>
                 </tr>
@@ -131,10 +136,10 @@ const fmt = (d: Date | number): string => {
     </div>
   </div>
 
-  <script>
-    document.querySelectorAll<HTMLFormElement>('form.delete-form').forEach((form) => {
+  <script define:vars={{ confirmText: t('sub.confirmDelete') }}>
+    document.querySelectorAll('form.delete-form').forEach((form) => {
       form.addEventListener('submit', (e) => {
-        if (!confirm('Permanently delete this subscriber? This cannot be undone.')) {
+        if (!confirm(confirmText)) {
           e.preventDefault();
         }
       });

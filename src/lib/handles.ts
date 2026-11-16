@@ -10,15 +10,16 @@ const RESERVED = new Set([
 
 export const HANDLE_RE = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
 
-export type HandleCheck = { ok: true; handle: string } | { ok: false; error: string };
+/** Errors are dictionary keys (src/i18n/studio.ts) so pages can translate them. */
+export type HandleCheck = { ok: true; handle: string } | { ok: false; error: 'handle.format' | 'handle.hyphens' | 'handle.reserved' };
 
 export const checkHandle = (raw: string): HandleCheck => {
   const handle = raw.trim().toLowerCase();
   if (!HANDLE_RE.test(handle)) {
-    return { ok: false, error: 'Use 3–30 lowercase letters, numbers or hyphens, starting and ending with a letter or number.' };
+    return { ok: false, error: 'handle.format' };
   }
-  if (handle.includes('--')) return { ok: false, error: 'Avoid consecutive hyphens.' };
-  if (RESERVED.has(handle)) return { ok: false, error: 'That address is reserved.' };
+  if (handle.includes('--')) return { ok: false, error: 'handle.hyphens' };
+  if (RESERVED.has(handle)) return { ok: false, error: 'handle.reserved' };
   return { ok: true, handle };
 };
 

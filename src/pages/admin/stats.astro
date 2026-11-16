@@ -5,8 +5,14 @@ import AdminHead from '../../components/AdminHead.astro';
 import { campaigns, getDbInstance, posts, subscribers } from '../../db';
 import { emailsThisMonth, formatBytes, limitsFor, mediaBytesUsed } from '../../lib/plans';
 import { loadSettings } from '../../lib/settings';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
 
 const publication = Astro.locals.publication;
+const lang = getLang(Astro.request);
+const t = studio(lang);
+const loc = lang === 'pt-BR' ? 'pt-BR' : 'en-US';
 const db = getDbInstance();
 const limits = limitsFor(publication);
 const settings = await loadSettings(publication.id);
@@ -57,9 +63,9 @@ const rate = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : 'â
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
 <head>
-	<AdminHead title={`Stats â€” ${settings.clientName}`} />
+	<AdminHead title={`${t('nav.stats')} â€” ${settings.clientName}`} />
 	<style is:global>
 		.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 0.5rem; }
 		.tile { padding: 1.1rem 1.25rem; border: var(--hairline); background: #FBFAF7; }
@@ -79,32 +85,32 @@ const rate = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : 'â
 	<div class="wrap">
 		<div class="card">
 			<header class="page-head">
-				<span class="eyebrow">How itâ€™s landing</span>
-				<h1>Stats</h1>
+				<span class="eyebrow">{t('stats.eyebrow')}</span>
+				<h1>{t('nav.stats')}</h1>
 			</header>
 
 			<div class="tiles">
-				<div class="tile"><span class="n">{Number(counts?.active ?? 0)}</span><span class="l">Active</span></div>
-				<div class="tile"><span class="n">{Number(counts?.pending ?? 0)}</span><span class="l">Awaiting confirm</span></div>
-				<div class="tile"><span class="n">{Number(counts?.gone ?? 0)}</span><span class="l">Unsubscribed</span></div>
+				<div class="tile"><span class="n">{Number(counts?.active ?? 0)}</span><span class="l">{t('stats.active')}</span></div>
+				<div class="tile"><span class="n">{Number(counts?.pending ?? 0)}</span><span class="l">{t('stats.pending')}</span></div>
+				<div class="tile"><span class="n">{Number(counts?.gone ?? 0)}</span><span class="l">{t('stats.unsub')}</span></div>
 			</div>
 
-			<h2>New subscribers, last 12 weeks</h2>
+			<h2>{t('stats.weeks')}</h2>
 			<div class="bars" role="img" aria-label={`Weekly new subscribers: ${weeks.join(', ')}`}>
 				{weeks.map((n) => <span style={`height:${Math.round((n / peak) * 100)}%`} title={`${n}`}></span>)}
 			</div>
-			<div class="bars-axis"><span>12 weeks ago</span><span>this week</span></div>
+			<div class="bars-axis"><span>{t('stats.weeksAgo')}</span><span>{t('stats.thisWeek')}</span></div>
 
-			<h2>Campaigns</h2>
-			{recent.length === 0 ? <p class="empty">Nothing sent yet.</p> : (
+			<h2>{t('stats.campaigns')}</h2>
+			{recent.length === 0 ? <p class="empty">{t('stats.none')}</p> : (
 				<div style="overflow-x:auto">
 					<table>
-						<thead><tr><th>Post</th><th>Sent</th><th>Delivered</th><th>Failed</th><th>Opened</th><th>Clicked</th></tr></thead>
+						<thead><tr><th>{t('stats.post')}</th><th>{t('stats.sent')}</th><th>{t('stats.delivered')}</th><th>{t('stats.failed')}</th><th>{t('stats.opened')}</th><th>{t('stats.clicked')}</th></tr></thead>
 						<tbody>
 							{recent.map((c) => (
 								<tr>
-									<td>{c.title}<br /><span class="badge">{c.status}</span></td>
-									<td>{c.sentAt.toISOString().slice(0, 10)}</td>
+									<td>{c.title}<br /><span class="badge">{c.status === 'sent' ? t('status.sent') : c.status}</span></td>
+									<td>{c.sentAt.toLocaleDateString(loc, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
 									<td>{c.sent} / {c.recipients}</td>
 									<td>{c.failed}</td>
 									<td>{rate(Number(c.opened), c.sent)}</td>
@@ -115,20 +121,20 @@ const rate = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : 'â
 					</table>
 				</div>
 			)}
-			<p class="hint">Opens depend on the readerâ€™s mail app loading images, so treat them as a lower bound.</p>
+			<p class="hint">{t('stats.opensNote')}</p>
 
-			<h2>Plan usage â€” {publication.plan}{limits.probation ? ' (first week)' : ''}</h2>
+			<h2>{t('stats.usage', { plan: t(publication.plan === 'pro' ? 'plan.pro' : 'plan.free') })}{limits.probation ? t('ov.firstWeek') : ''}</h2>
 			<div class="usage">
 				<div>
-					<div class="meta"><span>Emails this month</span><span>{used.toLocaleString()} / {limits.emailsPerMonth.toLocaleString()}</span></div>
+					<div class="meta"><span>{t('stats.emails')}</span><span>{used.toLocaleString(loc)} / {limits.emailsPerMonth.toLocaleString(loc)}</span></div>
 					<div class="meter"><span style={`width:${pct(used, limits.emailsPerMonth)}`}></span></div>
 				</div>
 				<div>
-					<div class="meta"><span>Subscribers</span><span>{(Number(counts?.active ?? 0) + Number(counts?.pending ?? 0)).toLocaleString()} / {limits.subscribers.toLocaleString()}</span></div>
+					<div class="meta"><span>{t('stats.subscribers')}</span><span>{(Number(counts?.active ?? 0) + Number(counts?.pending ?? 0)).toLocaleString()} / {limits.subscribers.toLocaleString()}</span></div>
 					<div class="meter"><span style={`width:${pct(Number(counts?.active ?? 0) + Number(counts?.pending ?? 0), limits.subscribers)}`}></span></div>
 				</div>
 				<div>
-					<div class="meta"><span>Media</span><span>{formatBytes(media)} / {formatBytes(limits.mediaBytes)}</span></div>
+					<div class="meta"><span>{t('stats.media')}</span><span>{formatBytes(media)} / {formatBytes(limits.mediaBytes)}</span></div>
 					<div class="meter"><span style={`width:${pct(media, limits.mediaBytes)}`}></span></div>
 				</div>
 			</div>

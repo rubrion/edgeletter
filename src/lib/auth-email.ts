@@ -1,10 +1,12 @@
 import { EMAIL, microStyle } from './email-style';
 import { platformFrom, sendMail } from './mailer';
+import type { Lang } from '../i18n';
+import { studio } from '../i18n/studio';
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-const layout = (title: string, intro: string, cta: string, url: string, outro: string) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${EMAIL.fontsLink}</head>
+const layout = (title: string, intro: string, cta: string, url: string, outro: string, lang: Lang) => `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${EMAIL.fontsLink}</head>
 <body style="margin:0;padding:0;background:${EMAIL.paper};font-family:${EMAIL.body};color:${EMAIL.text};">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${EMAIL.paper};">
   <tr><td align="center" style="padding:40px 12px;">
@@ -24,23 +26,25 @@ const layout = (title: string, intro: string, cta: string, url: string, outro: s
   </td></tr>
 </table></body></html>`;
 
-export const sendLoginLink = async (to: string, url: string): Promise<void> => {
+export const sendLoginLink = async (to: string, url: string, lang: Lang = 'en'): Promise<void> => {
+  const t = studio(lang);
   await sendMail({
     from: platformFrom('EdgeLetter', 'signin'),
     to,
-    subject: 'Your EdgeLetter sign-in link',
-    html: layout('Sign in to EdgeLetter', 'Use the button below to sign in. The link works once and expires in 15 minutes.', 'Sign in', url, 'If you didn’t ask for this, you can ignore this email.'),
-    text: `Sign in to EdgeLetter (link expires in 15 minutes):\n${url}\n\nIf you didn't ask for this, ignore this email.`,
+    subject: t('mail.signinSubject'),
+    html: layout(t('mail.signinTitle'), t('mail.signinIntro'), t('mail.signinCta'), url, t('mail.signinOutro'), lang),
+    text: t('mail.signinText', { url }),
   });
 };
 
-export const sendInvite = async (to: string, url: string, publicationName: string, inviter: string): Promise<void> => {
+export const sendInvite = async (to: string, url: string, publicationName: string, inviter: string, lang: Lang = 'en'): Promise<void> => {
+  const t = studio(lang);
   const pub = escapeHtml(publicationName);
   await sendMail({
     from: platformFrom('EdgeLetter', 'invites'),
     to,
-    subject: `You're invited to edit ${publicationName}`,
-    html: layout(`Join ${pub}`, `${escapeHtml(inviter)} invited you to edit <strong>${pub}</strong> on EdgeLetter.`, 'Accept invitation', url, 'The invitation expires in 7 days.'),
-    text: `${inviter} invited you to edit ${publicationName} on EdgeLetter.\nAccept: ${url}\n(expires in 7 days)`,
+    subject: t('mail.inviteSubject', { pub: publicationName }),
+    html: layout(t('mail.inviteTitle', { pub }), t('mail.inviteIntro', { who: escapeHtml(inviter), pub }), t('mail.inviteCta'), url, t('mail.inviteOutro'), lang),
+    text: t('mail.inviteText', { who: inviter, pub: publicationName, url }),
   });
 };

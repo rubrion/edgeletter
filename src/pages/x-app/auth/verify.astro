@@ -2,6 +2,10 @@
 import AppLayout from '../../../layouts/AppLayout.astro';
 import { addMember, consumeLoginToken, findOrCreateUser, rememberPublication, startSession } from '../../../lib/auth';
 import { safeNext } from '../../../lib/redirects';
+import { getLang } from '../../../i18n';
+import { studio } from '../../../i18n/studio';
+
+const t = studio(getLang(Astro.request));
 
 /**
  * Magic-link landing. GET only renders a confirm button: mail scanners that
@@ -15,7 +19,7 @@ if (Astro.request.method === 'POST') {
 	const form = await Astro.request.formData();
 	const row = await consumeLoginToken(String(form.get('token') ?? ''));
 	if (!row) {
-		return Astro.redirect('/signin?error=' + encodeURIComponent('That link is invalid or has expired. Request a new one.'), 303);
+		return Astro.redirect('/signin?error=link', 303);
 	}
 	const user = await findOrCreateUser(row.email);
 	const secure = Astro.url.protocol === 'https:';
@@ -29,17 +33,17 @@ if (Astro.request.method === 'POST') {
 }
 ---
 
-<AppLayout title="Sign in" bare width="narrow">
+<AppLayout title={t('signin.title')} bare width="narrow">
 	<div class="card app-card" style="text-align:center">
 		<header class="page-head">
-			<span class="eyebrow">One more step</span>
-			<h1>Continue to EdgeLetter</h1>
-			<p class="sub">Confirm it’s you to finish signing in.</p>
+			<span class="eyebrow">{t('verify.eyebrow')}</span>
+			<h1>{t('verify.title')}</h1>
+			<p class="sub">{t('verify.lead')}</p>
 		</header>
 		<form method="post">
 			<input type="hidden" name="token" value={token} />
 			<input type="hidden" name="next" value={next} />
-			<button type="submit" style="width:100%">Continue</button>
+			<button type="submit" style="width:100%">{t('verify.submit')}</button>
 		</form>
 	</div>
 </AppLayout>

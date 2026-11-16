@@ -7,6 +7,10 @@ import { allow } from '../../lib/ratelimit';
 import { checkHandle, suggestHandle } from '../../lib/handles';
 import { saveSettings } from '../../lib/settings';
 import { platformDomain } from '../../lib/tenant';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
+const t = studio(getLang(Astro.request));
 
 /** Owned publications per account; staff are exempt. */
 const MAX_OWNED = 3;
@@ -29,19 +33,19 @@ if (Astro.request.method === 'POST') {
 		.from(memberships)
 		.where(and(eq(memberships.userId, user.id), eq(memberships.role, 'owner')));
 	const owned = Number(row?.n ?? 0);
-	if (!(await allow(`onboard:${user.id}`))) error = 'Too many attempts. Try again in a minute.';
-	else if (!values.name) error = 'Give your publication a name.';
-	else if (!check.ok) error = check.error;
-	else if (!user.isStaff && owned >= MAX_OWNED) error = `Each account can run up to ${MAX_OWNED} publications.`;
+	if (!(await allow(`onboard:${user.id}`))) error = t('common.tooMany');
+	else if (!values.name) error = t('onb.errName');
+	else if (!check.ok) error = t(check.error);
+	else if (!user.isStaff && owned >= MAX_OWNED) error = t('onb.errMax', { n: MAX_OWNED });
 	else {
 		const [taken] = await db.select({ id: publications.id }).from(publications).where(eq(publications.handle, check.handle)).limit(1);
-		if (taken) error = 'That address is taken. Try another.';
+		if (taken) error = t('onb.errTaken');
 		else {
 			const id = crypto.randomUUID();
 			try {
 				await db.insert(publications).values({ id, handle: check.handle, name: values.name });
 			} catch {
-				error = 'That address is taken. Try another.';
+				error = t('onb.errTaken');
 			}
 			if (!error) {
 				await addMember(user.id, id, 'owner');
@@ -54,32 +58,32 @@ if (Astro.request.method === 'POST') {
 }
 ---
 
-<AppLayout title="New publication" width="narrow">
+<AppLayout title={t('onb.title')} width="narrow">
 	<div class="card app-card">
 		<header class="page-head">
-			<span class="eyebrow">A fresh sheet</span>
-			<h1>Start a publication</h1>
-			<p class="sub">You can change the name and look later. The address is permanent.</p>
+			<span class="eyebrow">{t('onb.eyebrow')}</span>
+			<h1>{t('onb.heading')}</h1>
+			<p class="sub">{t('onb.lead')}</p>
 		</header>
 		{error && <div class="alert err">{error}</div>}
 		<form method="post">
 			<div class="field">
-				<label for="name">Name</label>
-				<input id="name" name="name" type="text" required maxlength="120" value={values.name} placeholder="Field Notes" />
+				<label for="name">{t('onb.name')}</label>
+				<input id="name" name="name" type="text" required maxlength="120" value={values.name} placeholder={t('onb.namePh')} />
 			</div>
 			<div class="field">
-				<label for="handle">Address</label>
+				<label for="handle">{t('onb.address')}</label>
 				<div class="row" style="align-items:center;gap:0.4rem">
 					<input id="handle" name="handle" type="text" required pattern="[a-z0-9][a-z0-9\-]{1,28}[a-z0-9]" value={values.handle} placeholder="field-notes" style="flex:1" />
 					<span class="muted">.{platformDomain()}</span>
 				</div>
-				<div class="hint">3–30 lowercase letters, numbers or hyphens.</div>
+				<div class="hint">{t('onb.addressHint')}</div>
 			</div>
 			<div class="field">
-				<label for="tagline">Tagline <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
-				<input id="tagline" name="tagline" type="text" maxlength="280" value={values.tagline} placeholder="Notes on slow work, sent monthly." />
+				<label for="tagline">{t('onb.tagline')} <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">{t('common.optional')}</span></label>
+				<input id="tagline" name="tagline" type="text" maxlength="280" value={values.tagline} placeholder={t('onb.taglinePh')} />
 			</div>
-			<button type="submit" style="width:100%;margin-top:0.5rem">Create publication</button>
+			<button type="submit" style="width:100%;margin-top:0.5rem">{t('onb.submit')}</button>
 		</form>
 	</div>
 	<script is:inline>

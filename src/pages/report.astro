@@ -7,9 +7,11 @@ import { getLang } from '../i18n';
 import { EMAIL_RE } from '../lib/auth';
 import { allow, clientIp } from '../lib/ratelimit';
 import { isTurnstileEnabled, verifyTurnstile } from '../lib/turnstile';
+import { studio } from '../i18n/studio';
 
 // Abuse reports about this publication go to platform staff, not the writer.
 const lang = getLang(Astro.request);
+const t = studio(lang);
 const publication = Astro.locals.publication;
 const REASONS = ['spam', 'harassment', 'illegal content', 'impersonation', 'phishing or malware', 'other'];
 const turnstile = isTurnstileEnabled(env);
@@ -24,14 +26,14 @@ if (Astro.request.method === 'POST') {
 	const email = String(form.get('email') ?? '').trim().slice(0, 200);
 	const url = String(form.get('url') ?? '').trim().slice(0, 500);
 	const ip = clientIp(Astro.request);
-	if (!REASONS.includes(reason)) error = 'Choose a reason.';
-	else if (email && !EMAIL_RE.test(email)) error = 'That email address looks wrong.';
-	else if (!(await allow(`report:${ip}`))) error = 'Too many reports. Try again later.';
+	if (!REASONS.includes(reason)) error = t('rep.errReason');
+	else if (email && !EMAIL_RE.test(email)) error = t('rep.errEmail');
+	else if (!(await allow(`report:${ip}`))) error = t('rep.errRate');
 	else {
 		const verdict = turnstile
 			? await verifyTurnstile({ env, token: String(form.get('cf-turnstile-response') ?? ''), remoteIp: ip })
 			: { ok: true as const };
-		if (!verdict.ok) error = 'Please complete the verification.';
+		if (!verdict.ok) error = t('signin.errVerify');
 		else {
 			await getDbInstance()
 				.insert(reports)
@@ -45,29 +47,29 @@ if (Astro.request.method === 'POST') {
 <!doctype html>
 <html lang={lang}>
 	<head>
-		<BaseHead title={`Report — ${publication.name}`} description="Report abuse to EdgeLetter staff." />
+		<BaseHead title={`${t('rep.title')} — ${publication.name}`} description={t('rep.lead')} />
 		<meta name="robots" content="noindex" />
 	</head>
 	<body>
 		<Header />
 		<main>
 			<header style="text-align:center;margin-bottom:2rem">
-				<span class="eyebrow">To the platform</span>
-				<h1>Report this publication</h1>
-				<p style="font-style:italic;color:var(--muted)">Reports go to EdgeLetter staff, not to the writer.</p>
+				<span class="eyebrow">{t('rep.eyebrow')}</span>
+				<h1>{t('rep.title')}</h1>
+				<p style="font-style:italic;color:var(--muted)">{t('rep.lead')}</p>
 			</header>
 			<div class="card" style="padding:2.25rem 2.5rem">
 				{done ? (
-					<p style="text-align:center;margin:0">Thank you. Staff will review your report.</p>
+					<p style="text-align:center;margin:0">{t('rep.thanks')}</p>
 				) : (
 					<form method="post" class="report-form">
 						{error && <p style="color:#9C2F14">{error}</p>}
-						<label>Reason<select name="reason" required><option value="">Choose…</option>{REASONS.map((r) => <option value={r}>{r}</option>)}</select></label>
-						<label>Page (optional)<input name="url" type="url" placeholder="https://…" /></label>
-						<label>Details<textarea name="details" rows="5" maxlength="2000"></textarea></label>
-						<label>Your email (optional)<input name="email" type="email" placeholder="so staff can follow up" /></label>
+						<label>{t('rep.reason')}<select name="reason" required><option value="">{t('rep.choose')}</option>{REASONS.map((r) => <option value={r}>{t(`rep.r.${r}` as 'rep.r.spam')}</option>)}</select></label>
+						<label>{t('rep.page')}<input name="url" type="url" placeholder="https://…" /></label>
+						<label>{t('rep.details')}<textarea name="details" rows="5" maxlength="2000"></textarea></label>
+						<label>{t('rep.email')}<input name="email" type="email" placeholder={t('rep.emailPh')} /></label>
 						{turnstile && <div class="cf-turnstile" data-sitekey={siteKey}></div>}
-						<button type="submit" class="btn">Send report</button>
+						<button type="submit" class="btn">{t('rep.send')}</button>
 					</form>
 				)}
 			</div>

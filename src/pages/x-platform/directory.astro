@@ -2,14 +2,18 @@
 import PlatformLayout from '../../layouts/PlatformLayout.astro';
 import { listedPublications } from '../../lib/discovery';
 import { publicationOrigin } from '../../lib/tenant';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
+const t = studio(getLang(Astro.request));
 
 const pubs = await listedPublications();
 ---
 
-<PlatformLayout title="Directory — EdgeLetter" description="Every publication listed on EdgeLetter.">
+<PlatformLayout title={t('pf.directoryTitle')} description={t('pf.directoryDesc')}>
 	<main>
-		<header class="head"><span class="eyebrow rise">Who writes here</span><h1 class="rise" style="--i:1">Directory</h1></header>
-		{pubs.length === 0 ? <p style="text-align:center;font-style:italic;color:var(--muted)">No publications listed yet.</p> : (
+		<header class="head"><span class="eyebrow rise">{t('pf.whoWrites')}</span><h1 class="rise" style="--i:1">{t('pf.directory')}</h1></header>
+		{pubs.length === 0 ? <p style="text-align:center;font-style:italic;color:var(--muted)">{t('pf.noListed')}</p> : (
 			<ul class="dir">
 				{pubs.map((p) => (
 					<li class="reveal"><a class="card lift" href={publicationOrigin(Astro.url, p)}><strong>{p.name}</strong><span class="micro">{new URL(publicationOrigin(Astro.url, p)).host}</span></a></li>

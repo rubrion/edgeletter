@@ -1,0 +1,49 @@
+---
+/**
+ * EN ⇄ PT switch for the platform and studio. Stores the choice in the
+ * `lang` cookie, shared across *.<PLATFORM_DOMAIN> so it follows the writer
+ * from the landing to the studio and their publication.
+ */
+import { getLang } from '../i18n';
+import { studio } from '../i18n/studio';
+import { platformDomain } from '../lib/tenant';
+
+interface Props {
+	class?: string;
+}
+const lang = getLang(Astro.request);
+const t = studio(lang);
+const next = lang === 'pt-BR' ? 'en' : 'pt-BR';
+const root = platformDomain();
+---
+
+<button type="button" class:list={['lang-switch', Astro.props.class]} data-next={next} data-root={root} lang={next === 'pt-BR' ? 'pt-BR' : 'en'}>
+	<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M3 12h18 M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9 M12 3C9.5 5.5 8.5 8.5 8.5 12s1 6.5 3.5 9" /></svg>
+	{t('lang.switch')}
+</button>
+
+<script>
+	document.querySelectorAll<HTMLButtonElement>('button.lang-switch').forEach((b) =>
+		b.addEventListener('click', () => {
+			const root = b.dataset.root ?? '';
+			const onPlatform = root && (location.hostname === root || location.hostname.endsWith(`.${root}`));
+			document.cookie = `lang=${b.dataset.next}; path=/; max-age=31536000; SameSite=Lax${onPlatform && root !== 'localhost' ? `; domain=.${root}` : ''}`;
+			location.reload();
+		}),
+	);
+</script>
+
+<style>
+	.lang-switch {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		background: none;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+		font-family: inherit;
+		color: inherit;
+	}
+	.lang-switch svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+</style>

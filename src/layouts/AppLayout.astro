@@ -2,6 +2,8 @@
 import AdminAppbar from '../components/AdminAppbar.astro';
 import AdminHead from '../components/AdminHead.astro';
 import LogoMark from '../components/LogoMark.astro';
+import { getLang } from '../i18n';
+import { studio } from '../i18n/studio';
 
 interface Props {
 	title: string;
@@ -13,10 +15,13 @@ interface Props {
 }
 
 const { title, current, bare = false, width = 'wide' } = Astro.props;
+const lang = getLang(Astro.request);
+const t = studio(lang);
+const year = new Date().getUTCFullYear();
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
 	<head>
 		<AdminHead title={`${title} — EdgeLetter`} />
 		<style is:global>
@@ -25,6 +30,7 @@ const { title, current, bare = false, width = 'wide' } = Astro.props;
 			.bare-body { display: grid; place-items: center; padding: 2rem 1rem; box-sizing: border-box; }
 			.bare-brand { display: flex; justify-content: center; margin-bottom: 1.5rem; }
 			.app-card { padding: 2.5rem 2.75rem 2.25rem; }
+			.bare-rights { margin: 1.5rem 0 0; text-align: center; font-size: 0.78rem; color: var(--muted); }
 			.row { display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap; }
 			.row .field { flex: 1; min-width: 180px; margin-bottom: 0; }
 			.stack > * + * { margin-top: 1rem; }
@@ -51,6 +57,7 @@ const { title, current, bare = false, width = 'wide' } = Astro.props;
 		<main class:list={['app-main', width === 'narrow' && 'narrow']}>
 			{bare && <div class="bare-brand"><a href="/"><LogoMark size={44} /></a></div>}
 			<slot />
+			{bare && <p class="bare-rights">{t('footer.rights', { year })}</p>}
 		</main>
 	</body>
 </html>

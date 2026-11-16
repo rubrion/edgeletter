@@ -2,6 +2,9 @@
 import { loadSettings } from '../../lib/settings';
 import AdminAppbar from '../../components/AdminAppbar.astro';
 import AdminHead from '../../components/AdminHead.astro';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
 
 const settings = await loadSettings(Astro.locals.publication.id);
 const saved = Astro.url.searchParams.get('saved') === '1';
@@ -10,26 +13,29 @@ const themeColor = settings.themePrimaryColor;
 
 const listed = Astro.locals.publication.listed;
 
+const lang = getLang(Astro.request);
+const t = studio(lang);
+
 const lightColors = [
-  { key: 'colorBgLight', label: 'Body background' },
-  { key: 'colorHeaderBgLight', label: 'Header background' },
-  { key: 'colorHeadingLight', label: 'Heading text' },
-  { key: 'colorTextLight', label: 'Body text' },
-  { key: 'colorMutedLight', label: 'Muted / secondary text' },
-  { key: 'colorBorderLight', label: 'Borders & code background' },
-] as const;
+  { key: 'colorBgLight', label: t('set.c.bg') },
+  { key: 'colorHeaderBgLight', label: t('set.c.header') },
+  { key: 'colorHeadingLight', label: t('set.c.heading') },
+  { key: 'colorTextLight', label: t('set.c.text') },
+  { key: 'colorMutedLight', label: t('set.c.muted') },
+  { key: 'colorBorderLight', label: t('set.c.border') },
+];
 
 const darkColors = [
-  { key: 'colorBgDark', label: 'Body background' },
-  { key: 'colorHeaderBgDark', label: 'Header background' },
-  { key: 'colorHeadingDark', label: 'Heading text' },
-  { key: 'colorTextDark', label: 'Body text' },
-  { key: 'colorMutedDark', label: 'Muted / secondary text' },
-  { key: 'colorBorderDark', label: 'Borders & code background' },
-] as const;
+  { key: 'colorBgDark', label: t('set.c.bg') },
+  { key: 'colorHeaderBgDark', label: t('set.c.header') },
+  { key: 'colorHeadingDark', label: t('set.c.heading') },
+  { key: 'colorTextDark', label: t('set.c.text') },
+  { key: 'colorMutedDark', label: t('set.c.muted') },
+  { key: 'colorBorderDark', label: t('set.c.border') },
+];
 ---
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
 <head>
   <AdminHead title={`Settings — ${settings.clientName}`} />
   <style is:global>
@@ -52,75 +58,75 @@ const darkColors = [
   <div class="wrap">
     <div class="card">
       <header class="page-head">
-        <span class="eyebrow">The house style</span>
-        <h1>Site settings</h1>
-        <p class="sub">Name, look and listing of your publication. Empty a field to restore its default.</p>
+        <span class="eyebrow">{t('set.eyebrow')}</span>
+        <h1>{t('set.heading')}</h1>
+        <p class="sub">{t('set.lead')}</p>
       </header>
 
-      {saved && <div class="alert ok">Saved.</div>}
+      {saved && <div class="alert ok">{t('common.saved')}</div>}
       {error && <div class="alert err">{error}</div>}
 
       <form method="POST" action="/api/admin/settings">
-        <h2>Brand</h2>
+        <h2>{t('set.brand')}</h2>
 
         <div class="field">
-          <label for="clientName">Brand name</label>
+          <label for="clientName">{t('set.brandName')}</label>
           <input type="text" id="clientName" name="clientName" value={settings.clientName} />
         </div>
 
         <div class="field">
-          <label for="clientTagline">Tagline</label>
+          <label for="clientTagline">{t('set.tagline')}</label>
           <textarea id="clientTagline" name="clientTagline">{settings.clientTagline}</textarea>
         </div>
 
         <div class="field">
-          <label for="clientLogoUrl">Logo URL</label>
+          <label for="clientLogoUrl">{t('set.logo')}</label>
           <input type="url" id="clientLogoUrl" name="clientLogoUrl" value={settings.clientLogoUrl} placeholder="https://..." />
-          <div class="hint">Public URL of the brand logo. Leave empty to show the brand name as text.</div>
+          <div class="hint">{t('set.logoHint')}</div>
         </div>
 
         <div class="field">
-          <label for="clientFaviconUrl">Favicon URL</label>
+          <label for="clientFaviconUrl">{t('set.favicon')}</label>
           <input type="url" id="clientFaviconUrl" name="clientFaviconUrl" value={settings.clientFaviconUrl} placeholder="https://..." />
         </div>
 
-        <h2>About page</h2>
+        <h2>{t('set.about')}</h2>
 
         <div class="field">
-          <label for="aboutBodyEn">About body (English)</label>
+          <label for="aboutBodyEn">{t('set.aboutEn')}</label>
           <textarea id="aboutBodyEn" name="aboutBodyEn" rows="4">{settings.aboutBodyEn}</textarea>
-          <div class="hint">Use <code>{'{name}'}</code> as a placeholder for the brand name. HTML allowed. Leave empty to restore the default.</div>
+          <div class="hint" set:html={t('set.aboutHint', { name: '<code>{name}</code>' })} />
         </div>
 
         <div class="field">
-          <label for="aboutBodyPt">About body (Português)</label>
+          <label for="aboutBodyPt">{t('set.aboutPt')}</label>
           <textarea id="aboutBodyPt" name="aboutBodyPt" rows="4">{settings.aboutBodyPt}</textarea>
-          <div class="hint">Use <code>{'{name}'}</code> como espaço reservado para o nome da marca. HTML permitido.</div>
+          <div class="hint" set:html={t('set.aboutHint', { name: '<code>{name}</code>' })} />
         </div>
 
-        <h2>Discovery</h2>
+        <h2>{t('set.discovery')}</h2>
 
         <div class="field">
           <label class="check">
             <input type="hidden" name="listed" value="0" />
             <input type="checkbox" name="listed" value="1" checked={listed} />
-            List this publication on edgeletter.blog
+            {t('set.listed')}
           </label>
-          <div class="hint">Shows your publication and recent posts on the platform's explore page and directory.</div>
+          <div class="hint">{t('set.listedHint')}</div>
         </div>
 
-        <h2>Theme colors — primary</h2>
+        <h2>{t('set.colorsPrimary')}</h2>
 
         <div class="field">
-          <label for="themePrimaryColor">Primary / accent color</label>
+          <label for="themePrimaryColor">{t('set.primary')}</label>
           <div class="color-row">
             <input type="color" data-picker-for="themePrimaryColor" value={settings.themePrimaryColor} />
             <input type="text" id="themePrimaryColor" name="themePrimaryColor" value={settings.themePrimaryColor} pattern="^#[0-9a-fA-F]{3,8}$" />
           </div>
-          <div class="hint">Buttons, links, focus rings, accents.</div>
+          <div class="hint">{t('set.primaryHint')}</div>
         </div>
 
-        <h2>Light mode</h2>
+        <h2>{t('set.light')}</h2>
         <div class="color-grid">
           {lightColors.map(({ key, label }) => (
             <div class="field">
@@ -133,7 +139,7 @@ const darkColors = [
           ))}
         </div>
 
-        <h2>Dark mode</h2>
+        <h2>{t('set.dark')}</h2>
         <div class="color-grid">
           {darkColors.map(({ key, label }) => (
             <div class="field">
@@ -147,7 +153,7 @@ const darkColors = [
         </div>
 
         <div class="actions">
-          <button type="submit">Save</button>
+          <button type="submit">{t('common.save')}</button>
         </div>
       </form>
     </div>

@@ -4,7 +4,7 @@ import { loadSettings } from '../lib/settings';
 import { publicationOrigin } from '../lib/tenant';
 import LogoMark from './LogoMark.astro';
 
-type Key = 'posts' | 'subscribers' | 'stats' | 'widget' | 'settings' | 'members' | 'keys' | 'billing' | 'domain' | 'staff' | 'home';
+type Key = 'posts' | 'subscribers' | 'stats' | 'widget' | 'settings' | 'members' | 'keys' | 'import' | 'billing' | 'domain' | 'staff' | 'home';
 
 interface Props {
   current?: Key;
@@ -25,6 +25,7 @@ const links: { key: Key; href: string; label: string; show: boolean }[] = [
   { key: 'settings', href: '/admin/settings', label: 'Settings', show: !!publication && owner },
   { key: 'widget', href: '/admin/widget', label: 'Widget', show: !!publication && owner },
   { key: 'members', href: '/members', label: 'Team', show: !!publication && owner },
+  { key: 'import', href: '/import', label: 'Import', show: !!publication && owner },
   { key: 'keys', href: '/keys', label: 'API keys', show: !!publication && owner },
   { key: 'domain', href: '/domain', label: 'Domain', show: !!publication && owner },
   { key: 'billing', href: '/billing', label: 'Plan', show: !!publication && owner },

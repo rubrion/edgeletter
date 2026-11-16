@@ -1,0 +1,168 @@
+---
+import { env } from 'cloudflare:workers';
+import { and, count, desc, eq } from 'drizzle-orm';
+import AppLayout from '../../layouts/AppLayout.astro';
+import { feedItems, feedSources, getDbInstance } from '../../db';
+import { allow } from '../../lib/ratelimit';
+import {
+	BACKFILL_ITEMS,
+	FeedError,
+	importFeed,
+	MAX_FEEDS_PER_PUBLICATION,
+	normalizeFeedUrl,
+	recordFeedFailure,
+} from '../../lib/feeds';
+
+const { publication } = Astro.locals as Required<App.Locals>;
+const db = getDbInstance();
+const workerEnv = env as unknown as Env;
+let error: string | null = null;
+let notice: string | null = null;
+
+const errText = (err: unknown) =>
+	err instanceof FeedError ? err.message : err instanceof Error && err.name === 'TimeoutError' ? 'The feed took too long to answer.' : 'Could not read the feed.';
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const action = form.get('action');
+	const id = String(form.get('id') ?? '');
+	const own = and(eq(feedSources.id, id), eq(feedSources.publicationId, publication.id));
+
+	if (action === 'add') {
+		const url = normalizeFeedUrl(String(form.get('url') ?? ''));
+		const lang = form.get('lang') === 'pt' ? 'pt' : 'en';
+		const autoSend = form.get('auto_send') === '1';
+		const [{ n }] = await db.select({ n: count() }).from(feedSources).where(eq(feedSources.publicationId, publication.id));
+		if (!url) error = 'Enter the full address of the feed, starting with https://';
+		else if (Number(n) >= MAX_FEEDS_PER_PUBLICATION) error = `A publication can import up to ${MAX_FEEDS_PER_PUBLICATION} feeds.`;
+		else if (!(await allow(`feed:add:${publication.id}`))) error = 'Too many attempts. Try again in a minute.';
+		else {
+			const [source] = await db
+				.insert(feedSources)
+				.values({ publicationId: publication.id, url, lang, autoSend })
+				.onConflictDoNothing()
+				.returning();
+			if (!source) error = 'That feed is already connected.';
+			else {
+				try {
+					const r = await importFeed(workerEnv, source, true);
+					notice = `Connected. Imported ${r.imported} existing post${r.imported === 1 ? '' : 's'} (not emailed). New posts are checked every 30 minutes.`;
+				} catch (err) {
+					console.error('feed connect failed', url, err);
+					// A feed that can't be read on day one isn't kept.
+					await db.delete(feedSources).where(eq(feedSources.id, source.id));
+					error = errText(err);
+				}
+			}
+		}
+	} else if (action === 'check') {
+		const [source] = await db.select().from(feedSources).where(own).limit(1);
+		if (source && (await allow(`feed:check:${source.id}`))) {
+			try {
+				const r = await importFeed(workerEnv, source);
+				notice = r.notModified
+					? 'No changes since the last check.'
+					: `Imported ${r.imported} new post${r.imported === 1 ? '' : 's'}${r.emailed ? `, emailed ${r.emailed}` : ''}.`;
+			} catch (err) {
+				await recordFeedFailure(source, err);
+				error = errText(err);
+			}
+		}
+	} else if (action === 'toggle-send') {
+		const [source] = await db.select({ autoSend: feedSources.autoSend }).from(feedSources).where(own).limit(1);
+		if (source) await db.update(feedSources).set({ autoSend: !source.autoSend }).where(own);
+	} else if (action === 'resume') {
+		await db.update(feedSources).set({ enabled: true, failCount: 0, lastError: null }).where(own);
+	} else if (action === 'remove') {
+		// Imported posts stay; only the connection is removed.
+		await db.delete(feedSources).where(own);
+		notice = 'Feed disconnected. Posts already imported were kept.';
+	}
+}
+
+const feeds = await db
+	.select({
+		feed: feedSources,
+		items: count(feedItems.guidHash),
+	})
+	.from(feedSources)
+	.leftJoin(feedItems, eq(feedItems.feedId, feedSources.id))
+	.where(eq(feedSources.publicationId, publication.id))
+	.groupBy(feedSources.id)
+	.orderBy(desc(feedSources.createdAt));
+const fmt = (d: Date | null) => (d ? d.toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : '—');
+---
+
+<AppLayout title="Import" current="import">
+	<div class="card app-card">
+		<header class="page-head">
+			<span class="eyebrow">Already writing elsewhere?</span>
+			<h1>Import from your blog</h1>
+			<p class="sub">Connect the RSS or Atom feed of your WordPress, Ghost, Medium or any other blog. New posts show up here, linked back to the original, and can go out to your subscribers.</p>
+		</header>
+		{notice && <div class="alert ok">{notice}</div>}
+		{error && <div class="alert err">{error}</div>}
+
+		<h2>Connected feeds</h2>
+		{feeds.length === 0 ? <p class="empty">No feeds yet.</p> : (
+			<div style="overflow-x:auto">
+				<table>
+					<thead><tr><th>Feed</th><th>Language</th><th>Email new posts</th><th>Last check</th><th></th></tr></thead>
+					<tbody>
+						{feeds.map(({ feed, items }) => (
+							<tr>
+								<td style="max-width:300px;word-break:break-all">
+									{feed.url}
+									<br /><span class="muted">{items} post{items === 1 ? '' : 's'} imported</span>
+									{feed.lastError && <><br /><span style="color:#9C2F14">{feed.lastError}</span></>}
+								</td>
+								<td><span class="badge">{feed.lang}</span></td>
+								<td>
+									<form method="post" class="inline-form">
+										<input type="hidden" name="action" value="toggle-send" /><input type="hidden" name="id" value={feed.id} />
+										<button type="submit" style="background:none;color:var(--accent);border:0;padding:0;letter-spacing:0;text-transform:none;font-size:0.9rem">{feed.autoSend ? 'On' : 'Off'}</button>
+									</form>
+								</td>
+								<td>{fmt(feed.lastCheckedAt)}{!feed.enabled && <><br /><span class="badge">paused</span></>}</td>
+								<td style="text-align:right;white-space:nowrap">
+									<form method="post" class="inline-form">
+										<input type="hidden" name="id" value={feed.id} />
+										<input type="hidden" name="action" value={feed.enabled ? 'check' : 'resume'} />
+										<button type="submit">{feed.enabled ? 'Check now' : 'Resume'}</button>
+									</form>
+									<form method="post" class="inline-form" style="margin-left:0.5rem">
+										<input type="hidden" name="action" value="remove" /><input type="hidden" name="id" value={feed.id} />
+										<button type="submit" style="background:none;color:var(--muted);border:0;letter-spacing:0;text-transform:none;font-size:0.9rem">Disconnect</button>
+									</form>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		)}
+
+		<h2>Connect a feed</h2>
+		<form method="post" class="stack">
+			<input type="hidden" name="action" value="add" />
+			<div class="field">
+				<label for="url">Feed address</label>
+				<input id="url" name="url" type="url" required placeholder="https://yourblog.com/feed" />
+				<div class="hint">Usually <code>/feed</code>, <code>/rss</code>, <code>/rss.xml</code> or <code>/atom.xml</code> on your blog. Medium: <code>https://medium.com/feed/@you</code>.</div>
+			</div>
+			<div class="row">
+				<div class="field" style="flex:0 0 180px;min-width:160px">
+					<label for="lang">Language</label>
+					<select id="lang" name="lang"><option value="en">English</option><option value="pt">Português</option></select>
+				</div>
+				<div class="field">
+					<label class="consent" style="display:flex;gap:0.5rem;align-items:center;font-size:0.95rem;font-weight:400;letter-spacing:0;text-transform:none;color:var(--text);margin-top:1.6rem">
+						<input type="checkbox" name="auto_send" value="1" /> Email new posts to my subscribers
+					</label>
+				</div>
+			</div>
+			<p class="hint">The {BACKFILL_ITEMS} most recent posts are imported straight away and never emailed. After that, only posts published later are sent.</p>
+			<button type="submit">Connect feed</button>
+		</form>
+	</div>
+</AppLayout>

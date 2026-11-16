@@ -51,14 +51,15 @@ const isOwnerOnly = (path: string): boolean =>
   under(path, '/members') ||
   under(path, '/keys') ||
   under(path, '/billing') ||
-  under(path, '/domain');
+  under(path, '/domain') ||
+  under(path, '/import');
 
 /** App pages that work without a session. */
 const isPublicAppPath = (path: string): boolean => path === '/signin' || under(path, '/auth');
 
 /** App pages (outside /admin) that act on the active publication. */
 const needsPublicationInApp = (path: string): boolean =>
-  ['/members', '/keys', '/billing', '/domain'].some((p) => under(path, p));
+  ['/members', '/keys', '/billing', '/domain', '/import'].some((p) => under(path, p));
 
 /**
  * On an old host, links in already-sent emails and API calls from existing

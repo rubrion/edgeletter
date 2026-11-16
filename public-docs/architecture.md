@@ -34,3 +34,13 @@ Redelivery is idempotent, and a partial unique index allows only one live campai
 ## Limits
 
 `src/lib/plans.ts`: subscribers, emails per month (500 during a free publication's first week), media bytes and AI tokens per day, enforced at subscribe, import, publish, upload and AI review.
+
+## Feed import
+
+Writers can connect up to 3 RSS/Atom feeds under **Import** (`src/lib/feeds.ts`, parser in `src/lib/feed-parse.ts`).
+- **On connect:** the 20 newest items are imported as published posts, with `canonical_url` pointing to the original. They are never emailed.
+- **Polling:** a cron (`*/30 * * * *`) checks due feeds (25 per run) with conditional GETs.
+- **New items:** imported oldest first. With auto-send on, they go out through the normal campaign path: monthly allowance, suppressions, queue.
+- **Dedupe:** `feed_items` (guid hash per feed) makes imports idempotent.
+- **Fetch limits:** 2 MB and 10 s per fetch; public addresses only (`global_fetch_strictly_public`).
+- **Failures:** 10 consecutive failures pause a feed until the writer resumes it.

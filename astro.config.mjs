@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import mdx from '@astrojs/mdx';
 import react from '@astrojs/react';
-import sitemap from '@astrojs/sitemap';
 import { defineConfig, fontProviders } from 'astro/config';
 import cloudflare from '@astrojs/cloudflare';
 
@@ -22,32 +21,21 @@ function wranglerVar(key) {
   }
 }
 
-const clientDomain = process.env.CLIENT_DOMAIN || wranglerVar('CLIENT_DOMAIN') || 'example.com';
-
-// Accept either a bare family name ("Montserrat") or a full CSS stack
-// ("'Montserrat', -apple-system, ..."). The Google provider only wants the family name,
-// so take the first comma-separated token and strip surrounding quotes/whitespace.
-const rawFont = (process.env.CLIENT_FONT || wranglerVar('CLIENT_FONT')).trim();
-const clientFont = rawFont
-  .split(',')[0]
-  .trim()
-  .replace(/^["']|["']$/g, '')
-  .trim();
+// Platform root; publications live on <handle>.<PLATFORM_DOMAIN> and canonical
+// URLs are built from each request's own host.
+const platformDomain = process.env.PLATFORM_DOMAIN || wranglerVar('PLATFORM_DOMAIN') || 'edgeletter.blog';
 
 // https://astro.build/config
 export default defineConfig({
-  site: `https://${clientDomain}`,
+  site: `https://${platformDomain}`,
   output: 'server',
   integrations: [
     mdx(),
     react(),
-    sitemap({
-      filter: (page) => !page.includes('/embed/'),
-    }),
   ],
 
   // Stationery type system: engraved editorial serif for display (its italic
-  // doubles as the eyebrow face), and a readable serif for body. CLIENT_FONT overrides body only.
+  // doubles as the eyebrow face), and a readable serif for body.
   fonts: [
     {
       provider: fontProviders.google(),
@@ -59,7 +47,7 @@ export default defineConfig({
     },
     {
       provider: fontProviders.google(),
-      name: clientFont || 'Newsreader',
+      name: 'Newsreader',
       cssVariable: '--font-body',
       fallbacks: ['Georgia', 'serif'],
       weights: [400, 500, 600],

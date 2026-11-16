@@ -1,5 +1,4 @@
 ---
-import { env } from 'cloudflare:workers';
 import { loadSettings } from '../../lib/settings';
 import AdminAppbar from '../../components/AdminAppbar.astro';
 import AdminHead from '../../components/AdminHead.astro';
@@ -9,10 +8,7 @@ const saved = Astro.url.searchParams.get('saved') === '1';
 const error = Astro.url.searchParams.get('error');
 const themeColor = settings.themePrimaryColor;
 
-const provider = (env as unknown as { EMAIL_PROVIDER?: string }).EMAIL_PROVIDER === 'GMAIL' ? 'GMAIL' : 'RESEND';
-const clientDomain = (env as unknown as { CLIENT_DOMAIN?: string }).CLIENT_DOMAIN ?? '';
-const fromDomain = (env as unknown as { EMAIL_FROM_DOMAIN?: string }).EMAIL_FROM_DOMAIN || clientDomain;
-const gmailUser = (env as unknown as { GMAIL_USER?: string }).GMAIL_USER ?? '';
+const listed = Astro.locals.publication.listed;
 
 const lightColors = [
   { key: 'colorBgLight', label: 'Body background' },
@@ -41,6 +37,7 @@ const darkColors = [
     .color-row input[type="text"] { flex: 1; max-width: 150px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.85rem; }
     .color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem 1.5rem; }
     .color-grid .field { margin: 0; }
+    .check { display: flex; align-items: center; gap: 0.55rem; font-size: 0.98rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text); }
     .email-row { display: flex; align-items: stretch; }
     .email-row input[type="text"] { border-right: none; }
     .email-row .domain {
@@ -57,7 +54,7 @@ const darkColors = [
       <header class="page-head">
         <span class="eyebrow">The house style</span>
         <h1>Site settings</h1>
-        <p class="sub">Brand visuals stored in the database. Empty a field to fall back to the seed value in <code>wrangler.jsonc</code>.</p>
+        <p class="sub">Name, look and listing of your publication. Empty a field to restore its default.</p>
       </header>
 
       {saved && <div class="alert ok">Saved.</div>}
@@ -101,39 +98,16 @@ const darkColors = [
           <div class="hint">Use <code>{'{name}'}</code> como espaço reservado para o nome da marca. HTML permitido.</div>
         </div>
 
-        <h2>Email</h2>
+        <h2>Discovery</h2>
 
-        {provider === 'GMAIL' ? (
-          <div class="field">
-            <label>Email "from" address</label>
-            <input type="email" value={gmailUser} disabled />
-            <div class="hint">
-              Provider is <strong>GMAIL</strong>. Gmail forces the From address to <code>GMAIL_USER</code>;
-              edit that secret in <code>wrangler.jsonc</code> / Cloudflare to change it.
-            </div>
-          </div>
-        ) : (
-          <div class="field">
-            <label for="emailFromLocal">Email "from" address</label>
-            <div class="email-row">
-              <input
-                type="text"
-                id="emailFromLocal"
-                name="emailFromLocal"
-                value={settings.emailFromLocal}
-                placeholder="noreply"
-                pattern="^[A-Za-z0-9._%+\\-]+$"
-                autocomplete="off"
-              />
-              <span class="domain">@{fromDomain}</span>
-            </div>
-            <div class="hint">
-              Provider is <strong>RESEND</strong>. Only the part before <code>@</code> is editable —
-              the domain comes from <code>EMAIL_FROM_DOMAIN</code> in <code>wrangler.jsonc</code>
-              (must be verified in Resend), independent of <code>CLIENT_DOMAIN</code>.
-            </div>
-          </div>
-        )}
+        <div class="field">
+          <label class="check">
+            <input type="hidden" name="listed" value="0" />
+            <input type="checkbox" name="listed" value="1" checked={listed} />
+            List this publication on edgeletter.blog
+          </label>
+          <div class="hint">Shows your publication and recent posts on the platform's explore page and directory.</div>
+        </div>
 
         <h2>Theme colors — primary</h2>
 

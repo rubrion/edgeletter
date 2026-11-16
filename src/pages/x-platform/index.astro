@@ -1,0 +1,82 @@
+---
+import PlatformLayout from '../../layouts/PlatformLayout.astro';
+import { excerptOf, recentListedPosts } from '../../lib/discovery';
+import { PLAN_LIMITS } from '../../lib/plans';
+import { platformOrigin, publicationOrigin } from '../../lib/tenant';
+
+const app = platformOrigin(Astro.url, 'app');
+const latest = await recentListedPosts(6);
+const fmt = (d: Date | null) => (d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+---
+
+<PlatformLayout title="EdgeLetter — newsletters, written by hand" description="Start a newsletter and blog on your own address in a minute. Free to start.">
+	<main>
+		<section class="hero">
+			<span class="eyebrow rise" style="--i:0">The Correspondence, for everyone</span>
+			<h1 class="rise" style="--i:1">Write it once.<br />Send it to everyone who asked.</h1>
+			<div class="ornament rise" style="--i:2" aria-hidden="true">✦</div>
+			<p class="tagline rise" style="--i:3">A blog and a newsletter on your own address. Readers subscribe; your posts land in their inbox. Free to start.</p>
+			<p class="rise" style="--i:4"><a class="btn" href={`${app}/signin`}>Start your publication</a></p>
+		</section>
+	</main>
+
+	<section class="features pocket">
+		<span class="pocket-label deboss" aria-hidden="true">How</span>
+		<div class="grid">
+			<div class="card lift reveal from-pocket" style="--i:1"><span class="micro bracket">Write</span><h3>An editor that stays out of the way</h3><p>Markdown, images and video, with an optional AI proofread.</p></div>
+			<div class="card lift reveal from-pocket" style="--i:2"><span class="micro bracket">Send</span><h3>Every post, to every reader</h3><p>Double opt-in, one-click unsubscribe and bounce handling, done for you.</p></div>
+			<div class="card lift reveal from-pocket" style="--i:3"><span class="micro bracket">Own</span><h3>Your list, your address</h3><p>Export subscribers anytime. Bring your own domain on Pro.</p></div>
+		</div>
+	</section>
+
+	{latest.length > 0 && (
+		<main class="latest">
+			<header class="head"><span class="eyebrow">Fresh from the press</span><h2>Recently published</h2></header>
+			<ul class="posts">
+				{latest.map((p) => (
+					<li class="reveal">
+						<a class="card lift post" href={p.canonicalUrl ?? `${publicationOrigin(Astro.url, p)}/blog/${p.slug}`}>
+							<span class="micro" style="color:var(--accent)">{p.pubName}</span>
+							<strong>{p.title}</strong>
+							<span class="ex">{excerptOf(p.contentMd)}…</span>
+							<span class="micro" style="color:var(--muted)">{fmt(p.publishedAt)}</span>
+						</a>
+					</li>
+				))}
+			</ul>
+			<p style="text-align:center"><a class="btn secondary" href="/explore">Explore everything</a></p>
+		</main>
+	)}
+
+	<main class="pricing">
+		<header class="head"><span class="eyebrow">Plain terms</span><h2>Free to start</h2></header>
+		<div class="plans">
+			<div class="card plan"><span class="micro bracket">Free</span><ul><li>{PLAN_LIMITS.free.subscribers.toLocaleString()} subscribers</li><li>{PLAN_LIMITS.free.emailsPerMonth.toLocaleString()} emails a month</li><li>yourname.edgeletter.blog</li></ul></div>
+			<div class="card plan featured"><span class="micro bracket">Pro</span><ul><li>{PLAN_LIMITS.pro.subscribers.toLocaleString()} subscribers</li><li>{PLAN_LIMITS.pro.emailsPerMonth.toLocaleString()} emails a month</li><li>Your own domain</li><li>No EdgeLetter watermark</li></ul></div>
+		</div>
+	</main>
+
+	<style>
+		.hero { text-align: center; padding: 3em 0 2em; }
+		.hero h1 { font-size: clamp(2.6rem, 7vw, 5rem); margin: 0; }
+		.tagline { max-width: 34em; margin: 0 auto 2rem; font-style: italic; font-size: 1.15em; color: var(--muted); }
+		.features { padding: 7rem 1.25rem 4rem; }
+		.pocket-label { position: absolute; top: 3rem; left: 0; right: 0; text-align: center; font-family: var(--font-display-stack); font-style: italic; font-weight: 500; font-size: clamp(4rem, 13vw, 10rem); line-height: 1; pointer-events: none; }
+		.grid { position: relative; z-index: 1; max-width: 960px; margin: 5rem auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; }
+		.grid .card { padding: 1.75rem; }
+		.grid h3 { font-size: 1.6rem; margin: 0.6rem 0 0.5rem; }
+		.grid p { margin: 0; font-size: 0.98rem; color: var(--text); }
+		.head { text-align: center; margin-bottom: 2rem; }
+		.head h2 { margin: 0; }
+		.posts { list-style: none; padding: 0; margin: 0 0 2.5rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+		.post { display: flex; flex-direction: column; gap: 0.5rem; padding: 1.5rem 1.6rem; text-decoration: none; color: var(--text); height: 100%; box-sizing: border-box; }
+		.post strong { font-family: var(--font-display-stack); font-weight: 500; font-size: 1.5rem; line-height: 1.15; color: var(--ink); }
+		.post .ex { font-style: italic; font-size: 0.95rem; color: var(--muted); }
+		.pricing { padding-top: 1rem; }
+		.plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+		.plan { padding: 1.75rem; }
+		.plan.featured { border-color: var(--accent); }
+		.plan ul { margin: 0.8rem 0 0; padding-left: 1.1rem; }
+		@media (max-width: 640px) { .posts, .plans { grid-template-columns: 1fr; } }
+	</style>
+</PlatformLayout>

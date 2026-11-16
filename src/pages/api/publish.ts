@@ -3,6 +3,7 @@ import { env } from 'cloudflare:workers';
 import { and, eq, inArray } from 'drizzle-orm';
 import { marked } from 'marked';
 import { audienceFor, CampaignAlreadyLive, enqueueCampaign, liveCampaignFor, retireStaleCampaigns } from '../../lib/email-queue';
+import { limitsFor, reserveEmails } from '../../lib/plans';
 import { sanitizeHtml } from '../../lib/sanitize';
 import { pubId } from '../../lib/tenant';
 import { getDbInstance, campaigns, posts, type Post } from '../../db';
@@ -47,7 +48,16 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
   const contentHtml = sanitizeHtml(await marked.parse(contentMd, { async: true }));
   const lang = body.lang === 'pt' ? 'pt' : 'en';
-  const canonicalUrl = /^https:\/\//.test(body.canonical_url ?? '') ? body.canonical_url! : null;
+  // Must be a well-formed https URL; normalizing through URL() also escapes
+  // characters that could break out of the href it ends up in (pages, emails).
+  const canonicalUrl = (() => {
+    try {
+      const u = new URL(body.canonical_url ?? '');
+      return u.protocol === 'https:' && !/["'<>\s]/.test(body.canonical_url ?? '') ? u.toString() : null;
+    } catch {
+      return null;
+    }
+  })();
   const stamped = body.published_at && !Number.isNaN(Date.parse(body.published_at)) ? new Date(body.published_at) : null;
 
   const db = getDbInstance();
@@ -133,6 +143,19 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   const subscriberIds = await audienceFor(publicationId, saved.lang);
+  const { emailsPerMonth, probation } = limitsFor(locals.publication);
+  if (!(await reserveEmails(publicationId, subscriberIds.length, emailsPerMonth))) {
+    return Response.json(
+      {
+        post: saved,
+        campaign: null,
+        dispatch: null,
+        alreadySent: false,
+        error: `Monthly email limit reached (${emailsPerMonth.toLocaleString()} emails${probation ? ' during the first week' : ''}). The post is published; upgrade to Pro or wait for next month to send it.`,
+      },
+      { status: 402 },
+    );
+  }
   try {
     const result = await enqueueCampaign({ env, publicationId, post: saved, subscriberIds });
     const [campaignRow] = await db.select().from(campaigns).where(eq(campaigns.id, result.campaignId)).limit(1);

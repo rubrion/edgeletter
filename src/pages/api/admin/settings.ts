@@ -1,9 +1,11 @@
 import type { APIRoute } from 'astro';
+import { eq } from 'drizzle-orm';
+import { getDbInstance, publications } from '../../../db';
+import { limitsFor } from '../../../lib/plans';
 import { COLOR_KEYS, type Settings, SETTING_KEYS, saveSettings } from '../../../lib/settings';
+import { invalidatePublicationCache } from '../../../lib/tenant';
 
 const HEX_COLOR = /^#[0-9a-fA-F]{3,8}$/;
-// RFC 5322-ish local-part: letters, digits, and `._%+-`. No `@`, no spaces.
-const EMAIL_LOCAL = /^[A-Za-z0-9._%+-]+$/;
 
 const CSS_LENGTH = /^\d+(\.\d+)?(px|rem|em|%|vw|vh)?$/;
 
@@ -13,9 +15,6 @@ const validate = (patch: Partial<Settings>): { ok: true } | { ok: false; error: 
     if (v && !HEX_COLOR.test(v)) {
       return { ok: false, error: `${key} must be a hex color like #1a2b3f` };
     }
-  }
-  if (patch.emailFromLocal && !EMAIL_LOCAL.test(patch.emailFromLocal)) {
-    return { ok: false, error: 'emailFromLocal must contain only letters, digits, and ._%+- (no @ or spaces)' };
   }
   if (patch.widgetDefaultTheme && !['auto', 'light', 'dark'].includes(patch.widgetDefaultTheme)) {
     return { ok: false, error: 'widgetDefaultTheme must be auto, light, or dark' };
@@ -67,6 +66,7 @@ export const POST: APIRoute = async ({ request, redirect, locals }) => {
   const contentType = request.headers.get('content-type') ?? '';
 
   let patch: Partial<Settings> = {};
+  let listed: boolean | null = null;
   let redirectPath = '/admin/settings';
   if (contentType.includes('application/json')) {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -84,6 +84,8 @@ export const POST: APIRoute = async ({ request, redirect, locals }) => {
       const v = all.length ? all[all.length - 1] : null;
       if (typeof v === 'string') patch[k] = v;
     }
+    const l = form.getAll('listed');
+    if (l.length) listed = l[l.length - 1] === '1';
     const r = form.get('_redirect');
     if (typeof r === 'string' && /^\/admin\/[A-Za-z0-9_-]+$/.test(r)) {
       redirectPath = r;
@@ -101,7 +103,19 @@ export const POST: APIRoute = async ({ request, redirect, locals }) => {
     return redirect(`${redirectPath}?error=${encodeURIComponent(v.error)}`, 303);
   }
 
+  // Hiding the watermark is a Pro perk.
+  if (patch.widgetHideWatermark === '1' && limitsFor(locals.publication).watermark) patch.widgetHideWatermark = '0';
+
   await saveSettings(locals.publication.id, patch);
+
+  // Name and discovery listing live on the publication row too.
+  const pubPatch: { name?: string; listed?: boolean } = {};
+  if (patch.clientName?.trim()) pubPatch.name = patch.clientName.trim().slice(0, 120);
+  if (listed !== null) pubPatch.listed = listed;
+  if (Object.keys(pubPatch).length) {
+    await getDbInstance().update(publications).set(pubPatch).where(eq(publications.id, locals.publication.id));
+    invalidatePublicationCache();
+  }
 
   if (contentType.includes('application/json')) {
     return new Response(JSON.stringify({ ok: true }), {

@@ -10,6 +10,8 @@ const translations = {
     'nav.toLight': 'Switch to light mode',
 
     'footer.rights': 'All rights reserved.',
+    'footer.report': 'Report',
+    'footer.made': 'Made with EdgeLetter',
 
     'subscribe.heading': 'Subscribe to the newsletter',
     'subscribe.emailLabel': 'Email',
@@ -47,6 +49,8 @@ const translations = {
     'nav.toLight': 'Mudar para modo claro',
 
     'footer.rights': 'Todos os direitos reservados.',
+    'footer.report': 'Denunciar',
+    'footer.made': 'Feito com EdgeLetter',
 
     'subscribe.heading': 'Assine a newsletter',
     'subscribe.emailLabel': 'E-mail',

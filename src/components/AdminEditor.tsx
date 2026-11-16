@@ -9,7 +9,6 @@ const ACCEPTED_MIME = new Set([
   'image/png',
   'image/webp',
   'image/gif',
-  'image/svg+xml',
   'video/mp4',
   'video/webm',
 ]);
@@ -122,7 +121,7 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
   const handleFiles = async (files: FileList | File[]) => {
     const list = Array.from(files).filter((f) => ACCEPTED_MIME.has(f.type));
     if (list.length === 0) {
-      setMessage('No supported files (jpg, png, webp, gif, svg, mp4, webm).');
+      setMessage('No supported files (jpg, png, webp, gif, mp4, webm).');
       return;
     }
     setBusy('uploading');
@@ -429,7 +428,7 @@ export default function AdminEditor({ recent, initialAiUsage }: Props) {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,video/mp4,video/webm"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
             multiple
             style={{ display: 'none' }}
             onChange={(e) => {

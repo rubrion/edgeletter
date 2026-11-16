@@ -1,0 +1,95 @@
+---
+import { and, count, eq } from 'drizzle-orm';
+import AppLayout from '../../layouts/AppLayout.astro';
+import { getDbInstance, memberships, publications } from '../../db';
+import { addMember, rememberPublication } from '../../lib/auth';
+import { allow } from '../../lib/ratelimit';
+import { checkHandle, suggestHandle } from '../../lib/handles';
+import { saveSettings } from '../../lib/settings';
+import { platformDomain } from '../../lib/tenant';
+
+/** Owned publications per account; staff are exempt. */
+const MAX_OWNED = 3;
+
+const user = Astro.locals.user!;
+let error: string | null = null;
+let values = { name: '', handle: '', tagline: '' };
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	values = {
+		name: String(form.get('name') ?? '').trim().slice(0, 120),
+		handle: String(form.get('handle') ?? ''),
+		tagline: String(form.get('tagline') ?? '').trim().slice(0, 280),
+	};
+	const check = checkHandle(values.handle || suggestHandle(values.name));
+	const db = getDbInstance();
+	const [row] = await db
+		.select({ n: count() })
+		.from(memberships)
+		.where(and(eq(memberships.userId, user.id), eq(memberships.role, 'owner')));
+	const owned = Number(row?.n ?? 0);
+	if (!(await allow(`onboard:${user.id}`))) error = 'Too many attempts. Try again in a minute.';
+	else if (!values.name) error = 'Give your publication a name.';
+	else if (!check.ok) error = check.error;
+	else if (!user.isStaff && owned >= MAX_OWNED) error = `Each account can run up to ${MAX_OWNED} publications.`;
+	else {
+		const [taken] = await db.select({ id: publications.id }).from(publications).where(eq(publications.handle, check.handle)).limit(1);
+		if (taken) error = 'That address is taken. Try another.';
+		else {
+			const id = crypto.randomUUID();
+			try {
+				await db.insert(publications).values({ id, handle: check.handle, name: values.name });
+			} catch {
+				error = 'That address is taken. Try another.';
+			}
+			if (!error) {
+				await addMember(user.id, id, 'owner');
+				await saveSettings(id, { clientName: values.name, clientTagline: values.tagline });
+				rememberPublication(Astro.cookies, id, Astro.url.protocol === 'https:');
+				return Astro.redirect(`/admin?pub=${id}&welcome=1`, 303);
+			}
+		}
+	}
+}
+---
+
+<AppLayout title="New publication" width="narrow">
+	<div class="card app-card">
+		<header class="page-head">
+			<span class="eyebrow">A fresh sheet</span>
+			<h1>Start a publication</h1>
+			<p class="sub">You can change the name and look later. The address is permanent.</p>
+		</header>
+		{error && <div class="alert err">{error}</div>}
+		<form method="post">
+			<div class="field">
+				<label for="name">Name</label>
+				<input id="name" name="name" type="text" required maxlength="120" value={values.name} placeholder="Field Notes" />
+			</div>
+			<div class="field">
+				<label for="handle">Address</label>
+				<div class="row" style="align-items:center;gap:0.4rem">
+					<input id="handle" name="handle" type="text" required pattern="[a-z0-9][a-z0-9\-]{1,28}[a-z0-9]" value={values.handle} placeholder="field-notes" style="flex:1" />
+					<span class="muted">.{platformDomain()}</span>
+				</div>
+				<div class="hint">3–30 lowercase letters, numbers or hyphens.</div>
+			</div>
+			<div class="field">
+				<label for="tagline">Tagline <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
+				<input id="tagline" name="tagline" type="text" maxlength="280" value={values.tagline} placeholder="Notes on slow work, sent monthly." />
+			</div>
+			<button type="submit" style="width:100%;margin-top:0.5rem">Create publication</button>
+		</form>
+	</div>
+	<script is:inline>
+		// Suggest an address from the name until the writer edits it themselves.
+		const n = document.getElementById('name'), h = document.getElementById('handle');
+		let touched = !!h.value;
+		h.addEventListener('input', () => (touched = true));
+		n.addEventListener('input', () => {
+			if (touched) return;
+			h.value = n.value.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30).replace(/-+$/, '');
+		});
+	</script>
+</AppLayout>

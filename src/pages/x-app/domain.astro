@@ -1,0 +1,103 @@
+---
+import { eq } from 'drizzle-orm';
+import AppLayout from '../../layouts/AppLayout.astro';
+import { getDbInstance, publications } from '../../db';
+import { cnameTarget, createHostname, customDomainsEnabled, customHostnamesInUse, getHostname, maxCustomHostnames, releaseHostname, validCustomHost, type HostnameState } from '../../lib/custom-hostnames';
+import { limitsFor } from '../../lib/plans';
+import { invalidatePublicationCache, platformDomain } from '../../lib/tenant';
+import { PENDING_TTL_MS } from '../../lib/custom-hostnames';
+
+const { publication } = Astro.locals as Required<App.Locals>;
+const db = getDbInstance();
+const allowed = limitsFor(publication).customDomain;
+let error: string | null = null;
+let state: HostnameState | null = null;
+
+const load = async () =>
+	(await db
+		.select({ customDomain: publications.customDomain, pendingDomain: publications.pendingDomain, cfHostnameId: publications.cfHostnameId })
+		.from(publications)
+		.where(eq(publications.id, publication.id))
+		.limit(1))[0]!;
+let row = await load();
+
+if (Astro.request.method === 'POST' && customDomainsEnabled()) {
+	const form = await Astro.request.formData();
+	const action = form.get('action');
+	try {
+		if (action === 'add' && allowed && !row.cfHostnameId) {
+			const host = validCustomHost(String(form.get('host') ?? ''));
+			if (!host) error = 'Enter a domain like newsletter.example.com.';
+			else {
+				const [taken] = await db.select({ id: publications.id }).from(publications).where(eq(publications.customDomain, host)).limit(1);
+				if (taken) error = 'That domain is already connected to another publication.';
+				else if ((await customHostnamesInUse()) >= maxCustomHostnames()) error = 'Custom domains are at capacity right now. Please try again later.';
+				else {
+					state = await createHostname(host);
+					await db
+						.update(publications)
+						.set({ pendingDomain: host, cfHostnameId: state.id, pendingDomainSince: new Date() })
+						.where(eq(publications.id, publication.id));
+				}
+			}
+		} else if (action === 'remove' && row.cfHostnameId) {
+			await releaseHostname(publication.id, row.cfHostnameId);
+		}
+	} catch (err) {
+		error = err instanceof Error ? err.message : String(err);
+	}
+	row = await load();
+}
+
+// Poll provisioning on every visit until Cloudflare reports it active, then switch over.
+if (row.cfHostnameId && row.pendingDomain && customDomainsEnabled()) {
+	try {
+		state ??= await getHostname(row.cfHostnameId);
+		if (state.active && row.customDomain !== row.pendingDomain) {
+			await db.update(publications).set({ customDomain: row.pendingDomain }).where(eq(publications.id, publication.id));
+			invalidatePublicationCache();
+			row = await load();
+		}
+	} catch (err) {
+		error = err instanceof Error ? err.message : String(err);
+	}
+}
+---
+
+<AppLayout title="Domain" current="domain">
+	<div class="card app-card">
+		<header class="page-head">
+			<span class="eyebrow">Your own address</span>
+			<h1>Custom domain</h1>
+			<p class="sub">Your publication always lives at {publication.handle}.{platformDomain()}. On Pro you can also serve it from your own domain.</p>
+		</header>
+		{error && <div class="alert err">{error}</div>}
+
+		{!customDomainsEnabled() ? (
+			<p class="empty">Custom domains aren't available yet.</p>
+		) : !allowed ? (
+			<p>Custom domains are part of Pro. <a href="/billing">See plans</a>.</p>
+		) : row.pendingDomain ? (
+			<div class="stack">
+				<dl class="kv">
+					<dt>Domain</dt><dd>{row.pendingDomain}</dd>
+					<dt>Status</dt><dd><span class="badge">{row.customDomain === row.pendingDomain ? 'live' : (state?.status ?? 'pending')}</span> {state && state.sslStatus !== 'active' && <span class="muted">certificate: {state.sslStatus}</span>}</dd>
+				</dl>
+				{row.customDomain !== row.pendingDomain && (
+					<>
+						<p>At your DNS provider, add this record. Activation usually takes a few minutes; refresh this page to check. Setups not finished within {Math.round(PENDING_TTL_MS / 86400000)} days are removed automatically.</p>
+						<table><thead><tr><th>Type</th><th>Name</th><th>Target</th></tr></thead><tbody><tr><td>CNAME</td><td><code>{row.pendingDomain}</code></td><td><code>{cnameTarget()}</code></td></tr></tbody></table>
+						{state?.errors.length ? <p class="hint">{state.errors.join(' · ')}</p> : null}
+					</>
+				)}
+				<form method="post"><input type="hidden" name="action" value="remove" /><button type="submit">Disconnect domain</button></form>
+			</div>
+		) : (
+			<form method="post" class="row">
+				<input type="hidden" name="action" value="add" />
+				<div class="field"><label for="host">Domain</label><input id="host" name="host" type="text" required placeholder="newsletter.example.com" /></div>
+				<button type="submit">Connect</button>
+			</form>
+		)}
+	</div>
+</AppLayout>

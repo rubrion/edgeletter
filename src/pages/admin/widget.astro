@@ -3,15 +3,17 @@ import { env } from 'cloudflare:workers';
 import { loadSettings } from '../../lib/settings';
 import AdminAppbar from '../../components/AdminAppbar.astro';
 import AdminHead from '../../components/AdminHead.astro';
+import { limitsFor } from '../../lib/plans';
+import { publicationOrigin } from '../../lib/tenant';
 
 const settings = await loadSettings(Astro.locals.publication.id);
 const themeColor = settings.themePrimaryColor;
 const saved = Astro.url.searchParams.get('saved') === '1';
 const error = Astro.url.searchParams.get('error');
 
-const clientDomain = (env as unknown as { CLIENT_DOMAIN?: string }).CLIENT_DOMAIN ?? '';
-// Origin used for snippet URLs. Falls back to the request origin when CLIENT_DOMAIN is unset.
-const publicOrigin = clientDomain ? `https://${clientDomain}` : Astro.url.origin;
+// Snippets point at the publication's public site, not the dashboard host.
+const publicOrigin = publicationOrigin(Astro.url, Astro.locals.publication);
+const isPro = !limitsFor(Astro.locals.publication).watermark;
 
 // Turnstile site key is a public token; safe to send to the client.
 const turnstileSiteKey =
@@ -119,11 +121,11 @@ const turnstileEnabled =
             </label>
             <label>
               <input type="hidden" name="widgetHideWatermark" value="0" />
-              <input type="checkbox" id="widgetHideWatermark" name="widgetHideWatermark" value="1" checked={settings.widgetHideWatermark === '1'} />
-              Hide "Powered by Rubrion" watermark
+              <input type="checkbox" id="widgetHideWatermark" name="widgetHideWatermark" value="1" checked={isPro && settings.widgetHideWatermark === '1'} disabled={!isPro} />
+              Hide "Made with EdgeLetter" 
             </label>
           </div>
-          <div class="hint">Watermark is shown by default. Hiding it is reserved for white-label customers.</div>
+          <div class="hint">{isPro ? 'Shown by default; you can hide it on Pro.' : 'Hiding the watermark is part of the Pro plan.'}</div>
         </div>
 
         <h2>Cross-origin embeds (CORS)</h2>

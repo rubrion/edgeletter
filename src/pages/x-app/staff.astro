@@ -1,0 +1,150 @@
+---
+import { and, desc, eq, sql } from 'drizzle-orm';
+import AppLayout from '../../layouts/AppLayout.astro';
+import { getDbInstance, memberships, publications, reports, users } from '../../db';
+import { addMember, EMAIL_RE, findOrCreateUser, normalizeEmail } from '../../lib/auth';
+import { invalidatePublicationCache, publicationOrigin } from '../../lib/tenant';
+import { customHostnamesInUse, maxCustomHostnames, releaseHostname } from '../../lib/custom-hostnames';
+
+const db = getDbInstance();
+let notice: string | null = null;
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const id = String(form.get('id') ?? '');
+	const action = form.get('action');
+	if (action === 'suspend' || action === 'restore') {
+		await db.update(publications).set({ status: action === 'suspend' ? 'suspended' : 'active' }).where(eq(publications.id, id));
+		invalidatePublicationCache();
+		notice = action === 'suspend' ? 'Publication suspended: site shows 451, sends stop.' : 'Publication restored.';
+	} else if (action === 'plan') {
+		const plan = form.get('plan') === 'pro' ? 'pro' : 'free';
+		if (plan === 'free') {
+			const [held] = await db.select({ cfHostnameId: publications.cfHostnameId }).from(publications).where(eq(publications.id, id)).limit(1);
+			if (held?.cfHostnameId) await releaseHostname(id, held.cfHostnameId);
+		}
+		await db.update(publications).set({ plan }).where(eq(publications.id, id));
+		invalidatePublicationCache();
+		notice = `Plan set to ${plan}.`;
+	} else if (action === 'grant') {
+		// Recovery path: make someone owner of a publication (e.g. after a migration).
+		const email = normalizeEmail(String(form.get('email') ?? ''));
+		const [pub] = await db.select({ id: publications.id }).from(publications).where(eq(publications.handle, String(form.get('handle') ?? '').trim().toLowerCase())).limit(1);
+		if (!EMAIL_RE.test(email) || !pub) notice = 'Unknown publication or invalid email.';
+		else {
+			const target = await findOrCreateUser(email);
+			await db.delete(memberships).where(and(eq(memberships.userId, target.id), eq(memberships.publicationId, pub.id)));
+			await addMember(target.id, pub.id, 'owner');
+			notice = `${email} is now an owner.`;
+		}
+	} else if (action === 'resolve') {
+		await db.update(reports).set({ status: 'resolved' }).where(eq(reports.id, id));
+		notice = 'Report resolved.';
+	}
+}
+
+const q = (Astro.url.searchParams.get('q') ?? '').trim().toLowerCase();
+const pubs = await db
+	.select({
+		id: publications.id,
+		handle: publications.handle,
+		name: publications.name,
+		plan: publications.plan,
+		status: publications.status,
+		customDomain: publications.customDomain,
+		createdAt: publications.createdAt,
+		subs: sql<number>`(SELECT count(*) FROM subscribers s WHERE s.publication_id = ${publications.id} AND s.status = 'active')`,
+		posts: sql<number>`(SELECT count(*) FROM posts p WHERE p.publication_id = ${publications.id})`,
+		owner: sql<string>`(SELECT u.email FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.publication_id = ${publications.id} AND m.role = 'owner' LIMIT 1)`,
+	})
+	.from(publications)
+	.where(q ? sql`lower(${publications.handle}) LIKE ${'%' + q + '%'} OR lower(${publications.name}) LIKE ${'%' + q + '%'}` : undefined)
+	.orderBy(desc(publications.createdAt))
+	.limit(100);
+const open = await db
+	.select({ id: reports.id, reason: reports.reason, details: reports.details, url: reports.url, createdAt: reports.createdAt, handle: publications.handle, pubId: publications.id })
+	.from(reports)
+	.innerJoin(publications, eq(publications.id, reports.publicationId))
+	.where(eq(reports.status, 'open'))
+	.orderBy(desc(reports.createdAt))
+	.limit(50);
+const fmt = (d: Date) => d.toISOString().slice(0, 10);
+const hostnamesUsed = await customHostnamesInUse();
+---
+
+<AppLayout title="Staff" current="staff">
+	<div class="card app-card">
+		<header class="page-head">
+			<span class="eyebrow">Back office</span>
+			<h1>Staff</h1>
+		</header>
+		{notice && <div class="alert ok">{notice}</div>}
+		<p class="muted">Custom hostnames in use: {hostnamesUsed} / {maxCustomHostnames()} (platform cap; Cloudflare bills hostnames beyond its free allowance).</p>
+
+		<h2>Open reports ({open.length})</h2>
+		{open.length === 0 ? <p class="empty">Nothing to review.</p> : (
+			<table>
+				<thead><tr><th>When</th><th>Publication</th><th>Reason</th><th>Details</th><th></th></tr></thead>
+				<tbody>
+					{open.map((r) => (
+						<tr>
+							<td>{fmt(r.createdAt)}</td>
+							<td>{r.handle}</td>
+							<td><span class="badge">{r.reason}</span></td>
+							<td style="max-width:320px">{r.details}{r.url && <><br /><span class="muted">{r.url}</span></>}</td>
+							<td style="text-align:right;white-space:nowrap">
+								<form method="post" class="inline-form"><input type="hidden" name="action" value="resolve" /><input type="hidden" name="id" value={r.id} /><button type="submit">Resolve</button></form>
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		)}
+
+		<h2>Grant ownership</h2>
+		<form method="post" class="row">
+			<input type="hidden" name="action" value="grant" />
+			<div class="field"><label for="g-handle">Publication handle</label><input id="g-handle" name="handle" type="text" required placeholder="rubrion" /></div>
+			<div class="field"><label for="g-email">Email</label><input id="g-email" name="email" type="email" required /></div>
+			<button type="submit">Make owner</button>
+		</form>
+
+		<h2>Publications</h2>
+		<form method="get" class="row" style="margin-bottom:1rem">
+			<div class="field"><label for="q">Search</label><input id="q" name="q" type="text" value={q} placeholder="handle or name" /></div>
+			<button type="submit">Search</button>
+		</form>
+		<div style="overflow-x:auto">
+			<table>
+				<thead><tr><th>Publication</th><th>Owner</th><th>Subs</th><th>Posts</th><th>Plan</th><th>Status</th><th></th></tr></thead>
+				<tbody>
+					{pubs.map((p) => (
+						<tr>
+							<td><a href={publicationOrigin(Astro.url, p)} target="_blank" rel="noopener">{p.name}</a><br /><span class="muted">{p.handle} · {fmt(p.createdAt)}</span></td>
+							<td>{p.owner ?? '—'}</td>
+							<td>{p.subs}</td>
+							<td>{p.posts}</td>
+							<td>
+								<form method="post" class="inline-form">
+									<input type="hidden" name="action" value="plan" /><input type="hidden" name="id" value={p.id} />
+									<select name="plan" onchange="this.form.submit()" style="width:auto;padding:0.25rem 1.8rem 0.25rem 0.5rem;font-size:0.85rem">
+										<option value="free" selected={p.plan === 'free'}>free</option>
+										<option value="pro" selected={p.plan === 'pro'}>pro</option>
+									</select>
+								</form>
+							</td>
+							<td><span class="badge">{p.status}</span></td>
+							<td style="text-align:right">
+								<form method="post" class="inline-form">
+									<input type="hidden" name="id" value={p.id} />
+									<input type="hidden" name="action" value={p.status === 'active' ? 'suspend' : 'restore'} />
+									<button type="submit">{p.status === 'active' ? 'Suspend' : 'Restore'}</button>
+								</form>
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</div>
+	</div>
+</AppLayout>

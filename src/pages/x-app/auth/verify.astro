@@ -1,0 +1,45 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+import { addMember, consumeLoginToken, findOrCreateUser, rememberPublication, startSession } from '../../../lib/auth';
+import { safeNext } from '../../../lib/redirects';
+
+/**
+ * Magic-link landing. GET only renders a confirm button: mail scanners that
+ * prefetch links can't burn the single-use token, and a session is only
+ * created by a same-origin POST (cross-site POSTs are rejected by middleware).
+ */
+const token = Astro.url.searchParams.get('token') ?? '';
+const next = safeNext(Astro.url.searchParams.get('next'), Astro.url.origin);
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const row = await consumeLoginToken(String(form.get('token') ?? ''));
+	if (!row) {
+		return Astro.redirect('/signin?error=' + encodeURIComponent('That link is invalid or has expired. Request a new one.'), 303);
+	}
+	const user = await findOrCreateUser(row.email);
+	const secure = Astro.url.protocol === 'https:';
+	await startSession(Astro.cookies, user.id, { secure, userAgent: Astro.request.headers.get('user-agent') });
+	if (row.purpose === 'invite' && row.publicationId && row.role) {
+		await addMember(user.id, row.publicationId, row.role);
+		rememberPublication(Astro.cookies, row.publicationId, secure);
+		return Astro.redirect('/admin', 303);
+	}
+	return Astro.redirect(safeNext(form.get('next'), Astro.url.origin), 303);
+}
+---
+
+<AppLayout title="Sign in" bare width="narrow">
+	<div class="card app-card" style="text-align:center">
+		<header class="page-head">
+			<span class="eyebrow">One more step</span>
+			<h1>Continue to EdgeLetter</h1>
+			<p class="sub">Confirm it’s you to finish signing in.</p>
+		</header>
+		<form method="post">
+			<input type="hidden" name="token" value={token} />
+			<input type="hidden" name="next" value={next} />
+			<button type="submit" style="width:100%">Continue</button>
+		</form>
+	</div>
+</AppLayout>

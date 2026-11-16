@@ -12,22 +12,30 @@
 	"observability": {
 		"enabled": true,
 	},
+	// Platform hosts: apex + app as custom domains; every <handle> subdomain and
+	// every Cloudflare-for-SaaS custom hostname reaches the Worker via the zone
+	// route. The pre-platform address stays attached as a redirecting alias.
 	"routes": [
-		{
-			"pattern": "edgeletter.rubrion.ai",
-			"custom_domain": true,
-		},
+		{ "pattern": "edgeletter.blog", "custom_domain": true },
+		{ "pattern": "app.edgeletter.blog", "custom_domain": true },
+		{ "pattern": "*/*", "zone_name": "edgeletter.blog" },
+		{ "pattern": "edgeletter.rubrion.ai", "custom_domain": true },
 	],
 	"vars": {
-		"CLIENT_DOMAIN": "edgeletter.rubrion.ai",
-		"CLIENT_SLUG": "rubrion",
-		"CLIENT_FONT": "",
+		"PLATFORM_DOMAIN": "edgeletter.blog",
+		"MAIL_FROM_DOMAIN": "mail.edgeletter.blog",
+		"CUSTOM_DOMAIN_TARGET": "customers.edgeletter.blog",
+		"CF_ZONE_ID": "b7982b3858faae64fb1485148a45e60e",
+		// Platform ceiling on custom hostnames; stays inside Cloudflare's 100 free.
+		"MAX_CUSTOM_HOSTNAMES": "90",
 		"MEDIA_PUBLIC_BASE": "https://media.rubrion.ai",
-		"EMAIL_PROVIDER": "RESEND",
-		"EMAIL_FROM_DOMAIN": "rubrion.ai",
-		"AI_REVIEW_DAILY_TOKEN_LIMIT": "8000",
 		"TURNSTILE_SITE_KEY": "0x4AAAAAADMKgjDCOeL0zVJj",
 	},
+	"triggers": { "crons": ["17 4 * * *"] },
+	// Sign-in, invites and reports: 5 attempts per key per minute.
+	"ratelimits": [
+		{ "name": "AUTH_LIMITER", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } },
+	],
 	// Campaign emails are fanned out through this queue (see src/lib/email-queue.ts).
 	"queues": {
 		"producers": [

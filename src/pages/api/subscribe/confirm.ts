@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { and, eq } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../../db';
 import { loadSettings } from '../../../lib/settings';
+import { limitsFor, subscriberCount } from '../../../lib/plans';
 
 const tokenLooksValid = (t: string | null): t is string =>
   !!t && /^[a-f0-9]{32,128}$/i.test(t);
@@ -48,6 +49,11 @@ export const GET: APIRoute = async ({ url, locals }) => {
   }
   if (row.confirmTokenExpiresAt && row.confirmTokenExpiresAt.getTime() < Date.now()) {
     return htmlPage('Link expired', 'This confirmation link has expired. Please subscribe again to get a fresh link.', accent);
+  }
+
+  // Only confirmed subscribers count toward the plan, so the cap is applied here.
+  if (row.status !== 'active' && (await subscriberCount(publicationId)) >= limitsFor(locals.publication).subscribers) {
+    return htmlPage('List is full', 'This publication is not accepting new subscribers right now.', accent);
   }
 
   await db

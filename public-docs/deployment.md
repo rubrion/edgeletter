@@ -1,91 +1,35 @@
-# Per-Tenant Deployment
+# Deployment
 
-> Run all commands from the repo root. Replace `<tenant>` with the tenant's slug (lowercase, hyphen-separated).
+## One-time platform setup
 
-### 1. Install
+1. **DNS on the `edgeletter.blog` zone**:
+   - The Worker attaches `edgeletter.blog` and `app.edgeletter.blog` as custom domains.
+   - Add a proxied wildcard record `* AAAA 100::` so `<handle>.edgeletter.blog` reaches the `*/*` route.
+2. **Custom domains (Cloudflare for SaaS)**:
+   - Enable Custom Hostnames on the zone.
+   - Create `customers.edgeletter.blog` (proxied `AAAA 100::`) and set it as the fallback origin.
+   - Put the zone id in `CF_ZONE_ID`.
+3. **Resend**:
+   - Verify `mail.edgeletter.blog` (DKIM, SPF, DMARC).
+   - Add a webhook to `https://app.edgeletter.blog/api/webhooks/resend` for `email.bounced`, `email.complained`, `email.opened` and `email.clicked`.
+4. **Stripe**:
+   - Create the Pro product and price.
+   - Add a webhook to `/api/webhooks/stripe` for `checkout.session.completed` and `customer.subscription.created/updated/deleted`.
+   - Enable the customer portal.
+5. **Google**: create an OAuth client with redirect `https://app.edgeletter.blog/auth/google/callback`.
+6. **Turnstile**: allow the `edgeletter.blog` hostname on the widget.
+7. **Queues**: `bunx wrangler queues create edgeletter-email` and `edgeletter-email-dlq`.
+8. **Secrets**: set them as listed in [configuration](configuration.md).
+9. **First staff account**:
+   - Sign in once at `app.edgeletter.blog`.
+   - Then run `UPDATE users SET is_staff = 1 WHERE email = '<you>'` with `wrangler d1 execute --remote`.
 
-```sh
-bun install
-```
-
-### 2. Create the D1 database
-
-```sh
-bunx wrangler d1 create <tenant>-edgeletter
-```
-
-Copy the returned `database_id` into `wrangler.jsonc`:
-
-```jsonc
-"d1_databases": [
-  {
-    "binding": "DB",
-    "database_name": "<tenant>-edgeletter",
-    "database_id": "<paste-here>",
-    "migrations_dir": "./drizzle"
-  }
-]
-```
-
-> The binding name **must be `DB`** for every tenant — that's the contract the code reads. Only `database_name` and `database_id` change per tenant.
-
-### 3. Create (or pick) an R2 bucket for media
+## Releasing
 
 ```sh
-bunx wrangler r2 bucket create <your-bucket>
+bunx wrangler d1 export rubrion-edgeletter --remote --output backup.sql   # always back up first
+bunx wrangler d1 migrations apply rubrion-edgeletter --remote
+bun run deploy
 ```
 
-One bucket can be shared across all tenants — uploads land under `edgeletter/<CLIENT_SLUG>/...` so each tenant has its own folder.
-
-### 4. Set tenant `vars` in `wrangler.jsonc`
-
-```jsonc
-"routes": [
-  { "pattern": "<tenant>.example.com", "custom_domain": true }
-],
-"vars": {
-  "CLIENT_DOMAIN": "<tenant>.example.com",
-  "CLIENT_SLUG": "<tenant>",
-  "CLIENT_FONT": "",
-  "MEDIA_PUBLIC_BASE": "https://media.example.com",
-  "EMAIL_PROVIDER": "RESEND"
-},
-"r2_buckets": [
-  { "binding": "MEDIA", "bucket_name": "<your-bucket>" }
-]
-```
-
-### 5. Apply database migrations
-
-```sh
-bunx wrangler d1 migrations apply <tenant>-edgeletter --local   # local
-bunx wrangler d1 migrations apply <tenant>-edgeletter --remote  # production
-```
-
-To regenerate the SQL after a schema change: `bun run db:generate`.
-
-### 6. Set secrets
-
-```sh
-bunx wrangler secret put MASTER_ADMIN_KEY        # always
-
-# If EMAIL_PROVIDER=RESEND
-bunx wrangler secret put RESEND_API_KEY
-
-# If EMAIL_PROVIDER=GMAIL
-bunx wrangler secret put GMAIL_USER
-bunx wrangler secret put GMAIL_APP_PASSWORD
-```
-
-### 7. Regenerate types and deploy
-
-```sh
-bun run cf-typegen   # refresh worker-configuration.d.ts
-bun run deploy       # astro build + wrangler deploy
-```
-
-### 8. Configure brand visuals via admin
-
-Open `https://<tenant>.example.com/admin/login`, paste your `MASTER_ADMIN_KEY`, then navigate to `/admin/settings` and fill in brand name, tagline, logo URL, favicon URL, theme primary color, and email From-address.
-
-Saved values take effect immediately on the next page render.
+Migrations are written so the previous release keeps working against the new schema until the deploy finishes.

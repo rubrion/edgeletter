@@ -1,0 +1,54 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { emailsThisMonth, formatBytes, limitsFor, mediaBytesUsed, PLAN_LIMITS, subscriberCount } from '../../lib/plans';
+import { stripeEnabled } from '../../lib/stripe';
+
+const { publication } = Astro.locals as Required<App.Locals>;
+const limits = limitsFor(publication);
+const [emails, subs, media] = await Promise.all([
+	emailsThisMonth(publication.id),
+	subscriberCount(publication.id),
+	mediaBytesUsed(publication.id),
+]);
+const pct = (a: number, b: number) => `${Math.min(100, Math.round((a / Math.max(1, b)) * 100))}%`;
+const error = Astro.url.searchParams.get('error');
+const upgraded = Astro.url.searchParams.get('upgraded') === '1';
+const pro = publication.plan === 'pro';
+---
+
+<AppLayout title="Plan" current="billing">
+	<div class="card app-card">
+		<header class="page-head">
+			<span class="eyebrow">Plain terms</span>
+			<h1>{pro ? 'Pro plan' : 'Free plan'}</h1>
+			<p class="sub">{limits.probation ? 'New publications send at most 500 emails during their first week.' : pro ? 'Thank you for supporting EdgeLetter.' : 'Upgrade when you outgrow the free limits.'}</p>
+		</header>
+		{upgraded && !pro && <div class="alert ok">Payment received — your plan updates in a few seconds. Refresh shortly.</div>}
+		{error && <div class="alert err">{error}</div>}
+
+		<h2>This month</h2>
+		<div class="stack">
+			<div><div class="row" style="justify-content:space-between"><span>Emails sent</span><span>{emails.toLocaleString()} / {limits.emailsPerMonth.toLocaleString()}</span></div><div class="meter"><span style={`width:${pct(emails, limits.emailsPerMonth)}`}></span></div></div>
+			<div><div class="row" style="justify-content:space-between"><span>Subscribers</span><span>{subs.toLocaleString()} / {limits.subscribers.toLocaleString()}</span></div><div class="meter"><span style={`width:${pct(subs, limits.subscribers)}`}></span></div></div>
+			<div><div class="row" style="justify-content:space-between"><span>Media</span><span>{formatBytes(media)} / {formatBytes(limits.mediaBytes)}</span></div><div class="meter"><span style={`width:${pct(media, limits.mediaBytes)}`}></span></div></div>
+		</div>
+
+		<h2>{pro ? 'Manage' : 'Pro includes'}</h2>
+		{pro ? (
+			<form method="post" action="/api/billing/portal"><button type="submit">Manage billing</button></form>
+		) : (
+			<>
+				<dl class="kv">
+					<dt>Subscribers</dt><dd>{PLAN_LIMITS.pro.subscribers.toLocaleString()}</dd>
+					<dt>Emails</dt><dd>{PLAN_LIMITS.pro.emailsPerMonth.toLocaleString()} a month</dd>
+					<dt>Media</dt><dd>{formatBytes(PLAN_LIMITS.pro.mediaBytes)}</dd>
+					<dt>Domain</dt><dd>Your own domain</dd>
+					<dt>Branding</dt><dd>No EdgeLetter watermark</dd>
+				</dl>
+				<form method="post" action="/api/billing/checkout" style="margin-top:1.5rem">
+					<button type="submit" disabled={!stripeEnabled()}>{stripeEnabled() ? 'Upgrade to Pro' : 'Upgrades open soon'}</button>
+				</form>
+			</>
+		)}
+	</div>
+</AppLayout>

@@ -1,33 +1,26 @@
-# Local Development
+# Local development
 
 ```sh
-bunx wrangler d1 migrations apply <tenant>-edgeletter --local   # one-time
-bun run dev                                                    # http://localhost:4321
+bun install
+bunx wrangler d1 migrations apply rubrion-edgeletter --local
+bun run dev            # http://localhost:4321
 ```
 
-> `bun run dev` runs `astro dev`, which has a Vite server but **no Cloudflare bindings**. For features that depend on `cloudflare:workers` env (D1, R2, env vars), use `bunx wrangler dev` instead.
-
-## Smoke test
+`.dev.vars` (never commit it):
 
 ```sh
-curl -X POST http://localhost:4321/api/subscribe \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"me@test.com"}'
-# → {"ok":true}
-
-bunx wrangler d1 execute <tenant>-edgeletter --local \
-  --command "SELECT email, status FROM subscribers"
+PLATFORM_DOMAIN=localhost
+RESEND_API_KEY=re_test
 ```
 
-Then open `/admin/login`, paste your `MASTER_ADMIN_KEY`, configure brand visuals at `/admin/settings`, write a markdown post (drag-drop images!), and hit **Publish + Send**.
+With `PLATFORM_DOMAIN=localhost`, browsers resolve `*.localhost` to your machine:
 
-## `.dev.vars`
+| URL | |
+|---|---|
+| `http://localhost:4321` | landing / explore |
+| `http://app.localhost:4321` | sign-in and dashboard |
+| `http://<handle>.localhost:4321` | a publication |
 
-Create `.dev.vars` at the repo root (do not commit it):
+In dev, transactional emails (sign-in links, invites, confirmations) are printed to the terminal instead of sent. Follow the sign-in link from there. Without a queue consumer running locally, campaigns are processed inline.
 
-```sh
-MASTER_ADMIN_KEY=local-dev-admin-key
-RESEND_API_KEY=re_dev_xxx
-GMAIL_USER=your-gmail@gmail.com
-GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
-```
+Tests: `bun test tests`.

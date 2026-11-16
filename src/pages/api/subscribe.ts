@@ -6,22 +6,12 @@ import { loadSettings } from '../../lib/settings';
 import { matchAllowedOrigin, corsHeaders } from '../../lib/cors';
 import { isTurnstileEnabled, verifyTurnstile } from '../../lib/turnstile';
 import { sendConfirmationEmail } from '../../lib/confirm-email';
+import { verifyApiKey } from '../../lib/auth';
+import { limitsFor, subscriberCount } from '../../lib/plans';
+import { allow, clientIp } from '../../lib/ratelimit';
 import { publicationHost } from '../../lib/tenant';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/**
- * Constant-time check of the x-subscribe-key header against SUBSCRIBE_API_KEY:
- * verify() succeeds only if HMAC(key) equals HMAC(secret), i.e. key === secret.
- */
-async function isTrustedCaller(key: string | null): Promise<boolean> {
-  const secret = (env as unknown as { SUBSCRIBE_API_KEY?: string }).SUBSCRIBE_API_KEY;
-  if (!secret || !key) return false;
-  const enc = new TextEncoder();
-  const hmac = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
-  const expected = await crypto.subtle.sign('HMAC', hmac, enc.encode(secret));
-  return crypto.subtle.verify('HMAC', hmac, expected, enc.encode(key));
-}
 
 const CONFIRM_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -83,10 +73,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return json({ error: 'invalid email' }, 400, cors);
   }
 
-  // A trusted server (the tenant's own site, which ran its own captcha) can
-  // subscribe on a visitor's behalf with SUBSCRIBE_API_KEY, so a custom form
+  // A trusted server (the writer's own site, which ran its own captcha) can
+  // subscribe on a visitor's behalf with a `subscribe` API key, so a custom form
   // still lands here: same list, same double opt-in, same dispatch.
-  const trusted = await isTrustedCaller(request.headers.get('x-subscribe-key'));
+  const trusted = await verifyApiKey(request.headers.get('x-subscribe-key'), publicationId, 'subscribe');
 
   if (!trusted && isTurnstileEnabled(env)) {
     const remoteIp =
@@ -95,6 +85,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
       null;
     const verdict = await verifyTurnstile({ env, token: turnstileToken, remoteIp });
     if (!verdict.ok) return json({ error: verdict.error }, 400, cors);
+  }
+
+  // Each confirmation is an email from the platform sender: cap the rate per
+  // visitor and per address so the form can't be used to mail-bomb anyone.
+  if (!trusted && (!(await allow(`subscribe:ip:${clientIp(request)}`)) || !(await allow(`subscribe:email:${email}`)))) {
+    return json({ error: 'Too many attempts. Try again in a minute.' }, 429, cors);
   }
 
   const db = getDbInstance();
@@ -107,9 +103,18 @@ export const POST: APIRoute = async ({ request, locals }) => {
     .where(and(eq(subscribers.publicationId, publicationId), eq(subscribers.email, email)))
     .limit(1);
 
-  // Already active — don't email again, idempotent success.
+  // Already active: nothing to send. Same response as a new sign-up, so the
+  // endpoint can't be used to check whether someone is on the list.
   if (existing && existing.status === 'active') {
-    return json({ ok: true, alreadyActive: true }, 200, cors);
+    return json({ ok: true, pending: true }, 200, cors);
+  }
+
+  // New addresses count toward the plan's list size.
+  if (!existing || existing.status === 'unsubscribed') {
+    const { subscribers: cap } = limitsFor(locals.publication);
+    if ((await subscriberCount(publicationId)) >= cap) {
+      return json({ error: 'This publication is not accepting new subscribers right now.' }, 403, cors);
+    }
   }
 
   const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
@@ -148,7 +153,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   const confirmUrl = `${origin}/api/subscribe/confirm?token=${token}`;
   try {
-    await sendConfirmationEmail({ env, settings, host, to: email, confirmUrl, lang });
+    await sendConfirmationEmail({ settings, host, to: email, confirmUrl, lang });
   } catch (err) {
     // Don't leak the address back if email fails — caller will retry.
     const msg = err instanceof Error ? err.message : String(err);

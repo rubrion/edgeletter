@@ -1,6 +1,7 @@
 ---
 import { Font } from 'astro:assets';
 import '../../../styles/embed.css';
+import { limitsFor } from '../../../lib/plans';
 import { and, eq } from 'drizzle-orm';
 import { sanitizeHtml } from '../../../lib/sanitize';
 import { getDbInstance, posts } from '../../../db';
@@ -29,11 +30,11 @@ const themeMode = (() => {
   return v === 'light' || v === 'dark' || v === 'auto' ? v : 'auto';
 })();
 const maxWidth = q.get('maxWidth') || settings.widgetMaxWidth || '720px';
-const accent = q.get('accent') || settings.widgetAccentOverride || settings.themePrimaryColor;
+const accent = hexColor(q.get('accent')) || settings.widgetAccentOverride || settings.themePrimaryColor;
 const fontInherit = q.get('font') === 'inherit';
 const showBackLink = q.get('back') !== '0';
 const backHref = `${Astro.url.origin}/embed/blog${Astro.url.search}`;
-const showWatermark = settings.widgetHideWatermark !== '1';
+const showWatermark = limitsFor(Astro.locals.publication).watermark || settings.widgetHideWatermark !== '1';
 
 const fontStack = fontInherit ? 'inherit' : "var(--font-body, 'Newsreader'), Georgia, serif";
 
@@ -82,8 +83,8 @@ const dataTheme = themeMode === 'auto' ? null : themeMode;
       </div>
       {showWatermark && (
         <div class="ep-wm-row">
-          <a class="ep-wm micro" href="https://rubrion.ai/?utm_source=edgeletter-widget"
-             target="_blank" rel="noopener nofollow">Powered by Rubrion</a>
+          <a class="ep-wm micro" href="https://edgeletter.blog/?utm_source=widget"
+             target="_blank" rel="noopener">Made with EdgeLetter</a>
         </div>
       )}
     </div>

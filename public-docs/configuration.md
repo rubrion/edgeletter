@@ -1,63 +1,50 @@
-# Configuration Reference
+# Configuration
 
-EdgeLetter splits configuration into three layers, each with a different lifecycle.
+## Wrangler `vars`
 
-## Admin-managed (D1 `settings` table) — change anytime, no redeploy
+| Var | Purpose |
+|---|---|
+| `PLATFORM_DOMAIN` | Platform root (`edgeletter.blog`); publications live on `<handle>.<PLATFORM_DOMAIN>` |
+| `MAIL_FROM_DOMAIN` | Verified Resend sending domain (`mail.edgeletter.blog`) |
+| `CUSTOM_DOMAIN_TARGET` | CNAME target writers point custom domains at (`customers.edgeletter.blog`) |
+| `CF_ZONE_ID` | Zone id of `PLATFORM_DOMAIN`, for the custom hostnames API |
+| `MAX_CUSTOM_HOSTNAMES` | Platform-wide ceiling on custom domains (default 90, inside Cloudflare's 100 free). New connections are refused at the cap |
+| `MEDIA_PUBLIC_BASE` | Public base URL of the R2 media bucket |
+| `TURNSTILE_SITE_KEY` | Turnstile site key (sign-in, subscribe, report) |
 
-Settings are stored **per publication** (`settings.publication_id`). A single-publication deployment uses the `default` publication.
+## Secrets (`wrangler secret put`)
 
-| Setting | Purpose | Wrangler seed key |
-| ------- | ------- | ----------------- |
-| `clientName` | Brand name shown across UI, OG metadata, RSS, emails | `CLIENT_NAME` |
-| `clientTagline` | Homepage subhead | `CLIENT_TAGLINE` |
-| `clientLogoUrl` | Header logo (replaces brand text when set) | `CLIENT_LOGO_URL` |
-| `clientFaviconUrl` | Custom favicon | `CLIENT_FAVICON_URL` |
-| `themePrimaryColor` | Accent color, injected as `--theme-primary` | `THEME_PRIMARY_COLOR` |
-| `emailFromAddress` | Resend `From` address. Domain must be verified in Resend. Ignored when `EMAIL_PROVIDER=GMAIL`. | `EMAIL_FROM_ADDRESS` |
+| Secret | Purpose |
+|---|---|
+| `RESEND_API_KEY` | Sending |
+| `RESEND_WEBHOOK_SECRET` | Svix secret of the Resend webhook → `/api/webhooks/resend` (bounced, complained, opened, clicked) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in; redirect `https://app.edgeletter.blog/auth/google/callback` |
+| `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_CONFIG` | Pro plan; webhook → `/api/webhooks/stripe` (checkout.session.completed, customer.subscription.*) |
+| `CF_API_TOKEN` | Token with *SSL and Certificates: Edit* on the platform zone (custom hostnames) |
+| `TURNSTILE_SECRET` | Enables Turnstile verification |
 
-Resolution at request time: **DB row → `wrangler.jsonc` seed (default publication only) → hard-coded default**. Saving an empty value in admin removes the override and falls back to the seed.
+Every feature degrades gracefully when its secret is missing: no Google button, upgrades disabled, custom domains unavailable.
 
-## Wrangler `vars` — change requires redeploy
-
-| Var | Required when | Purpose |
-| --- | ------------- | ------- |
-| `CLIENT_DOMAIN` | always | Canonical URLs, sitemap, default Resend `from` (`noreply@$CLIENT_DOMAIN`), Astro `site` URL |
-| `CLIENT_SLUG` | always | Folder name under `edgeletter/` in the media bucket. Keeps tenant uploads isolated |
-| `CLIENT_FONT` | optional | Google Font family for **body text** (default `Newsreader`; headings and italic eyebrows stay Cormorant Garamond). Read at **build time** |
-| `MEDIA_PUBLIC_BASE` | always | Public base URL of the R2 bucket. Used to build asset URLs after upload |
-| `EMAIL_PROVIDER` | always | `RESEND` or `GMAIL` |
-| `PLATFORM_DOMAIN` | multi-publication | Root domain for `<handle>.<PLATFORM_DOMAIN>` publication hosts. Unset = every unknown host serves the `default` publication |
-
-> `CLIENT_FONT` is read at **build time** by `astro.config.mjs`, so changing it requires a redeploy.
-
-## Wrangler bindings
+## Bindings
 
 | Binding | Type | Notes |
-| ------- | ---- | ----- |
-| `DB` | D1 | Per-tenant database. Binding name must always be `"DB"` |
-| `MEDIA` | R2 | Bucket for image / video uploads. Default publication uses `edgeletter/<CLIENT_SLUG>/`, others `edgeletter/pub/<publication_id>/` |
-| `EMAIL_QUEUE` | Queue | Campaign fan-out (`edgeletter-email`, DLQ `edgeletter-email-dlq`). Create once with `wrangler queues create`. If unbound, campaigns send inline |
-| `ASSETS` | Static assets | Astro's `dist/` output |
+|---|---|---|
+| `DB` | D1 | All publications |
+| `MEDIA` | R2 | `edgeletter/pub/<publication_id>/…`; pre-platform media keeps its old prefix |
+| `EMAIL_QUEUE` | Queue | `edgeletter-email` (+ DLQ `edgeletter-email-dlq`) |
+| `AUTH_LIMITER` | Rate limit | 5 per key per minute (sign-in, invites, reports) |
+| `AI` | Workers AI | Editor proofread |
 
-## Secrets — `wrangler secret put`
+## Per-publication settings
 
-| Secret | Required when | Purpose |
-| ------ | ------------- | ------- |
-| `MASTER_ADMIN_KEY` | always | Login key for `/admin/login`. Stored in an HttpOnly cookie after login |
-| `RESEND_API_KEY` | `EMAIL_PROVIDER=RESEND` | Resend API key (`re_...`) |
-| `GMAIL_USER` | `EMAIL_PROVIDER=GMAIL` | Gmail address. Used as both SMTP login and the `From:` address |
-| `GMAIL_APP_PASSWORD` | `EMAIL_PROVIDER=GMAIL` | [Gmail App Password](https://support.google.com/accounts/answer/185833) |
-| `TURNSTILE_SECRET` | optional | Turnstile secret for the widget in `TURNSTILE_SITE_KEY`. When set, `/api/subscribe` requires a valid token |
-| `SUBSCRIBE_API_KEY` | optional | Lets your own site subscribe visitors server-to-server: send it as `x-subscribe-key` to `/api/subscribe` and the Turnstile check is skipped (your site runs its own). Same list, double opt-in and dispatch |
-| `RESEND_WEBHOOK_SECRET` | recommended with RESEND | Svix signing secret (`whsec_…`) of a Resend webhook pointed at `/api/webhooks/resend` (events: `email.bounced`, `email.complained`). Hard bounces and complaints land in `email_suppressions` and are never mailed again |
+These are stored in the `settings` table, scoped by `publication_id`, and edited at `/admin/settings` and `/admin/widget`: name, tagline, logo, favicon, colors, About text and widget defaults. Name and discovery listing are mirrored on `publications`.
 
-## Local development (`.dev.vars`)
+## Custom domain costs
 
-`.dev.vars` is the Wrangler equivalent of `.env` — only loaded when `wrangler dev` runs. **Do not commit it.**
+Cloudflare allocates a large custom-hostname quota but bills hostnames beyond its free allowance. Three guards keep the count equal to what paying writers use:
 
-```sh
-MASTER_ADMIN_KEY=local-dev-admin-key
-RESEND_API_KEY=re_dev_xxx
-GMAIL_USER=your-gmail@gmail.com
-GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
-```
+1. `MAX_CUSTOM_HOSTNAMES`: hard platform ceiling.
+2. A downgrade from Pro (Stripe webhook or staff) releases the publication's hostname immediately.
+3. A daily cron (`17 4 * * *`) releases setups still pending after 7 days and any hostname held by a non-Pro publication.
+
+The staff console shows hostnames in use against the cap.

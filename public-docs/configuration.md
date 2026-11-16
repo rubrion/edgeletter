@@ -19,7 +19,7 @@
 | `RESEND_API_KEY` | Sending |
 | `RESEND_WEBHOOK_SECRET` | Svix secret of the Resend webhook → `/api/webhooks/resend` (bounced, complained, opened, clicked) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in; redirect `https://app.edgeletter.blog/auth/google/callback` |
-| `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO`, `STRIPE_WEBHOOK_SECRET` | Pro plan; webhook → `/api/webhooks/stripe` (checkout.session.completed, customer.subscription.*) |
+| `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_CONFIG` | Pro plan; webhook → `/api/webhooks/stripe` (checkout.session.completed, customer.subscription.*) |
 | `CF_API_TOKEN` | Token with *SSL and Certificates: Edit* on the platform zone (custom hostnames) |
 | `TURNSTILE_SECRET` | Enables Turnstile verification |
 

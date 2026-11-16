@@ -11,6 +11,7 @@ import {
   users,
   type Post,
 } from '../db';
+import { sha256 } from './auth';
 import { limitsFor } from './plans';
 import { providerFor, sendBatch, type Recipient } from './dispatch';
 import { loadSettings } from './settings';
@@ -306,8 +307,11 @@ export const processEmailJob = async (env: Env, job: EmailJob): Promise<string[]
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(and(eq(memberships.publicationId, job.publicationId), eq(memberships.role, 'owner')))
     .limit(1);
+  // Key = campaign + exact recipient set: a redelivered job maps to the same key.
+  const idempotencyKey = `batch-campaign/${job.campaignId}/${(await sha256(recipients.map((r) => r.id).sort().join(','))).slice(0, 32)}`;
   const outcome = await sendBatch({
     env,
+    idempotencyKey,
     settings,
     host: publicationHost(publication),
     replyTo: owner?.email ?? null,

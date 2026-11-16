@@ -5,7 +5,7 @@ import { env } from 'cloudflare:workers';
  * customer portal, and webhook signature verification.
  */
 
-type StripeEnv = { STRIPE_SECRET_KEY?: string; STRIPE_PRICE_PRO?: string; STRIPE_WEBHOOK_SECRET?: string };
+type StripeEnv = { STRIPE_SECRET_KEY?: string; STRIPE_PRICE_PRO?: string; STRIPE_WEBHOOK_SECRET?: string; STRIPE_PORTAL_CONFIG?: string };
 const cfg = () => env as unknown as StripeEnv;
 
 export const stripeEnabled = (): boolean => !!cfg().STRIPE_SECRET_KEY && !!cfg().STRIPE_PRICE_PRO;
@@ -64,7 +64,12 @@ export const retrieveSubscription = async (id: string) => {
 };
 
 export const createPortal = (customerId: string, returnUrl: string) =>
-  call<{ url: string }>('billing_portal/sessions', { customer: customerId, return_url: returnUrl });
+  call<{ url: string }>('billing_portal/sessions', {
+    customer: customerId,
+    return_url: returnUrl,
+    // Our portal configuration (cancel at period end, payment method, invoices).
+    ...(cfg().STRIPE_PORTAL_CONFIG ? { configuration: cfg().STRIPE_PORTAL_CONFIG } : {}),
+  });
 
 export { verifyStripeSignature } from './stripe-verify';
 

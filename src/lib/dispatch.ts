@@ -30,6 +30,11 @@ type SendArgs = {
   showWatermark: boolean;
   post: Pick<Post, 'title' | 'slug' | 'contentHtml' | 'lang' | 'canonicalUrl'>;
   recipients: Recipient[];
+  /**
+   * Resend dedupes identical batches with the same key for 24h, so a queue
+   * redelivery of an already-sent batch doesn't email anyone twice.
+   */
+  idempotencyKey?: string;
 };
 
 export const providerFor = (_env: Env): Provider => 'RESEND';
@@ -89,7 +94,11 @@ export const sendBatch = async (args: SendArgs): Promise<BatchOutcome> => {
   try {
     const res = await fetch('https://api.resend.com/emails/batch', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        ...(args.idempotencyKey ? { 'Idempotency-Key': args.idempotencyKey } : {}),
+      },
       body: JSON.stringify(payload),
     });
     if (res.ok) {
@@ -102,6 +111,9 @@ export const sendBatch = async (args: SendArgs): Promise<BatchOutcome> => {
     }
     // Rate limits and provider outages are worth retrying; validation errors are not.
     if (res.status === 429 || res.status >= 500) return { ...none, transient: ids };
+    // Same key, different payload (e.g. a settings change between attempts):
+    // the original batch already went out under this key.
+    if (res.status === 409) return { ...none, sent: ids };
     console.error('resend batch rejected', res.status, await res.text());
     return { ...none, permanent: ids };
   } catch (err) {

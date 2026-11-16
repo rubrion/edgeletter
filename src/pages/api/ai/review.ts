@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { env } from 'cloudflare:workers';
 import { aiUsage, getDbInstance } from '../../../db';
 
@@ -38,7 +38,8 @@ const estimateInputTokens = (inputChars: number): number =>
 const projectOutputTokens = (inputTokens: number): number =>
   Math.min(MAX_OUTPUT_TOKENS, Math.ceil(inputTokens * OUTPUT_OVERHEAD_RATIO) + OUTPUT_BUFFER_TOKENS);
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
+  const publicationId = locals.publication.id;
   const limitRaw = (env as unknown as { AI_REVIEW_DAILY_TOKEN_LIMIT?: string }).AI_REVIEW_DAILY_TOKEN_LIMIT;
   const limit = Number.parseInt(limitRaw ?? '', 10);
   if (!Number.isFinite(limit) || limit <= 0) {
@@ -70,7 +71,11 @@ export const POST: APIRoute = async ({ request }) => {
   const db = getDbInstance();
   const day = today();
 
-  const existing = await db.select().from(aiUsage).where(eq(aiUsage.day, day)).limit(1);
+  const existing = await db
+    .select()
+    .from(aiUsage)
+    .where(and(eq(aiUsage.publicationId, publicationId), eq(aiUsage.day, day)))
+    .limit(1);
   const usedToday = existing[0]?.tokensUsed ?? 0;
   const inputTokens = estimateInputTokens(contentMd.length);
   const projectedOutputTokens = projectOutputTokens(inputTokens);
@@ -113,9 +118,9 @@ export const POST: APIRoute = async ({ request }) => {
 
   await db
     .insert(aiUsage)
-    .values({ day, tokensUsed: actualTokens })
+    .values({ publicationId, day, tokensUsed: actualTokens })
     .onConflictDoUpdate({
-      target: aiUsage.day,
+      target: [aiUsage.publicationId, aiUsage.day],
       set: { tokensUsed: sql`${aiUsage.tokensUsed} + ${actualTokens}` },
     });
 

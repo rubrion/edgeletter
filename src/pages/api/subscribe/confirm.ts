@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../../db';
 import { loadSettings } from '../../../lib/settings';
 
@@ -25,8 +25,9 @@ p{margin:0;font-style:italic;color:#7A6E62;font-size:1rem;line-height:1.6;}
     { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
   );
 
-export const GET: APIRoute = async ({ url }) => {
-  const { themePrimaryColor: accent } = await loadSettings();
+export const GET: APIRoute = async ({ url, locals }) => {
+  const publicationId = locals.publication.id;
+  const { themePrimaryColor: accent } = await loadSettings(publicationId);
   const token = url.searchParams.get('token');
   if (!tokenLooksValid(token)) {
     return htmlPage('Invalid link', 'This confirmation link is malformed.', accent);
@@ -36,7 +37,7 @@ export const GET: APIRoute = async ({ url }) => {
   const [row] = await db
     .select()
     .from(subscribers)
-    .where(eq(subscribers.confirmToken, token))
+    .where(and(eq(subscribers.publicationId, publicationId), eq(subscribers.confirmToken, token)))
     .limit(1);
 
   if (!row) {

@@ -4,7 +4,7 @@ import { getDbInstance, subscribers } from '../../../../db';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, locals }) => {
   const ct = request.headers.get('content-type') ?? '';
   const isJson = ct.includes('application/json');
 
@@ -32,9 +32,9 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const db = getDbInstance();
   await db
     .insert(subscribers)
-    .values({ email })
+    .values({ publicationId: locals.publication.id, email })
     .onConflictDoUpdate({
-      target: subscribers.email,
+      target: [subscribers.publicationId, subscribers.email],
       set: { status: sql`'active'` },
     });
 

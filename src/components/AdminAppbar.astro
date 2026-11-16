@@ -8,7 +8,7 @@ interface Props {
 
 const { current } = Astro.props;
 
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const themeColor = settings.themePrimaryColor;
 const clientName = settings.clientName;
 

@@ -1,11 +1,12 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { eq } from 'drizzle-orm';
-import { getDbInstance, subscribers } from '../../db';
+import { and, eq } from 'drizzle-orm';
+import { emailSuppressions, getDbInstance, subscribers } from '../../db';
 import { loadSettings } from '../../lib/settings';
 import { matchAllowedOrigin, corsHeaders } from '../../lib/cors';
 import { isTurnstileEnabled, verifyTurnstile } from '../../lib/turnstile';
 import { sendConfirmationEmail } from '../../lib/confirm-email';
+import { publicationHost } from '../../lib/tenant';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -34,14 +35,15 @@ const json = (
     headers: { 'Content-Type': 'application/json', ...cors },
   });
 
-export const OPTIONS: APIRoute = async ({ request }) => {
-  const settings = await loadSettings();
+export const OPTIONS: APIRoute = async ({ request, locals }) => {
+  const settings = await loadSettings(locals.publication.id);
   const match = matchAllowedOrigin(request.headers.get('origin'), settings.widgetAllowedOrigins);
   return new Response(null, { status: 204, headers: corsHeaders(match) });
 };
 
-export const POST: APIRoute = async ({ request }) => {
-  const settings = await loadSettings();
+export const POST: APIRoute = async ({ request, locals }) => {
+  const publicationId = locals.publication.id;
+  const settings = await loadSettings(publicationId);
   const match = matchAllowedOrigin(request.headers.get('origin'), settings.widgetAllowedOrigins);
   const cors = corsHeaders(match);
 
@@ -96,13 +98,13 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const db = getDbInstance();
-  const clientDomain = (env as unknown as { CLIENT_DOMAIN?: string }).CLIENT_DOMAIN ?? '';
-  const origin = clientDomain ? `https://${clientDomain}` : new URL(request.url).origin;
+  const host = publicationHost(locals.publication);
+  const origin = host ? `https://${host}` : new URL(request.url).origin;
 
   const [existing] = await db
     .select()
     .from(subscribers)
-    .where(eq(subscribers.email, email))
+    .where(and(eq(subscribers.publicationId, publicationId), eq(subscribers.email, email)))
     .limit(1);
 
   // Already active — don't email again, idempotent success.
@@ -123,9 +125,10 @@ export const POST: APIRoute = async ({ request }) => {
         confirmTokenExpiresAt: expires,
         lang,
       })
-      .where(eq(subscribers.email, email));
+      .where(eq(subscribers.id, existing.id));
   } else {
     await db.insert(subscribers).values({
+      publicationId,
       email,
       status: 'pending',
       confirmToken: token,
@@ -134,9 +137,18 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
+  // Never mail an address that hard-bounced or complained; answer as usual so
+  // the endpoint doesn't reveal suppression status.
+  const [suppressed] = await db
+    .select({ email: emailSuppressions.email })
+    .from(emailSuppressions)
+    .where(eq(emailSuppressions.email, email))
+    .limit(1);
+  if (suppressed) return json({ ok: true, pending: true }, 200, cors);
+
   const confirmUrl = `${origin}/api/subscribe/confirm?token=${token}`;
   try {
-    await sendConfirmationEmail({ env, settings, to: email, confirmUrl, lang });
+    await sendConfirmationEmail({ env, settings, host, to: email, confirmUrl, lang });
   } catch (err) {
     // Don't leak the address back if email fails — caller will retry.
     const msg = err instanceof Error ? err.message : String(err);

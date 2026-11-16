@@ -4,7 +4,7 @@
 		"global_fetch_strictly_public"
 	],
 	"name": "web-rubrion-edgeletter",
-	"main": "@astrojs/cloudflare/entrypoints/server",
+	"main": "./src/worker.ts",
 	"assets": {
 		"directory": "./dist",
 		"binding": "ASSETS",
@@ -27,6 +27,21 @@
 		"EMAIL_FROM_DOMAIN": "rubrion.ai",
 		"AI_REVIEW_DAILY_TOKEN_LIMIT": "8000",
 		"TURNSTILE_SITE_KEY": "0x4AAAAAADMKgjDCOeL0zVJj",
+	},
+	// Campaign emails are fanned out through this queue (see src/lib/email-queue.ts).
+	"queues": {
+		"producers": [
+			{ "binding": "EMAIL_QUEUE", "queue": "edgeletter-email" },
+		],
+		"consumers": [
+			{
+				"queue": "edgeletter-email",
+				"max_batch_size": 10,
+				"max_batch_timeout": 5,
+				"max_retries": 5,
+				"dead_letter_queue": "edgeletter-email-dlq",
+			},
+		],
 	},
 	"ai": {
 		"binding": "AI",

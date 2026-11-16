@@ -2,6 +2,7 @@
 import { Font } from 'astro:assets';
 import '../../../styles/embed.css';
 import { and, eq } from 'drizzle-orm';
+import { sanitizeHtml } from '../../../lib/sanitize';
 import { getDbInstance, posts } from '../../../db';
 import { loadSettings, hexToRgbTuple } from '../../../lib/settings';
 
@@ -16,12 +17,12 @@ const db = getDbInstance();
 const [post] = await db
   .select()
   .from(posts)
-  .where(and(eq(posts.slug, slug), eq(posts.isPublished, true)))
+  .where(and(eq(posts.publicationId, Astro.locals.publication.id), eq(posts.slug, slug), eq(posts.isPublished, true)))
   .limit(1);
 
 if (!post) return new Response('not found', { status: 404 });
 
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const q = Astro.url.searchParams;
 const themeMode = (() => {
   const v = q.get('theme') || settings.widgetDefaultTheme;
@@ -76,7 +77,7 @@ const dataTheme = themeMode === 'auto' ? null : themeMode;
       </header>
       <div class="sheet">
         <div class="content">
-          <Fragment set:html={post.contentHtml} />
+          <Fragment set:html={sanitizeHtml(post.contentHtml)} />
         </div>
       </div>
       {showWatermark && (

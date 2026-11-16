@@ -63,7 +63,7 @@ const validate = (patch: Partial<Settings>): { ok: true } | { ok: false; error: 
   return { ok: true };
 };
 
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, locals }) => {
   const contentType = request.headers.get('content-type') ?? '';
 
   let patch: Partial<Settings> = {};
@@ -101,7 +101,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     return redirect(`${redirectPath}?error=${encodeURIComponent(v.error)}`, 303);
   }
 
-  await saveSettings(patch);
+  await saveSettings(locals.publication.id, patch);
 
   if (contentType.includes('application/json')) {
     return new Response(JSON.stringify({ ok: true }), {

@@ -4,6 +4,8 @@ EdgeLetter splits configuration into three layers, each with a different lifecyc
 
 ## Admin-managed (D1 `settings` table) — change anytime, no redeploy
 
+Settings are stored **per publication** (`settings.publication_id`). A single-publication deployment uses the `default` publication.
+
 | Setting | Purpose | Wrangler seed key |
 | ------- | ------- | ----------------- |
 | `clientName` | Brand name shown across UI, OG metadata, RSS, emails | `CLIENT_NAME` |
@@ -13,7 +15,7 @@ EdgeLetter splits configuration into three layers, each with a different lifecyc
 | `themePrimaryColor` | Accent color, injected as `--theme-primary` | `THEME_PRIMARY_COLOR` |
 | `emailFromAddress` | Resend `From` address. Domain must be verified in Resend. Ignored when `EMAIL_PROVIDER=GMAIL`. | `EMAIL_FROM_ADDRESS` |
 
-Resolution at request time: **DB row → `wrangler.jsonc` seed → hard-coded default**. Saving an empty value in admin removes the override and falls back to the seed.
+Resolution at request time: **DB row → `wrangler.jsonc` seed (default publication only) → hard-coded default**. Saving an empty value in admin removes the override and falls back to the seed.
 
 ## Wrangler `vars` — change requires redeploy
 
@@ -24,6 +26,7 @@ Resolution at request time: **DB row → `wrangler.jsonc` seed → hard-coded de
 | `CLIENT_FONT` | optional | Google Font family for **body text** (default `Newsreader`; headings and italic eyebrows stay Cormorant Garamond). Read at **build time** |
 | `MEDIA_PUBLIC_BASE` | always | Public base URL of the R2 bucket. Used to build asset URLs after upload |
 | `EMAIL_PROVIDER` | always | `RESEND` or `GMAIL` |
+| `PLATFORM_DOMAIN` | multi-publication | Root domain for `<handle>.<PLATFORM_DOMAIN>` publication hosts. Unset = every unknown host serves the `default` publication |
 
 > `CLIENT_FONT` is read at **build time** by `astro.config.mjs`, so changing it requires a redeploy.
 
@@ -32,7 +35,8 @@ Resolution at request time: **DB row → `wrangler.jsonc` seed → hard-coded de
 | Binding | Type | Notes |
 | ------- | ---- | ----- |
 | `DB` | D1 | Per-tenant database. Binding name must always be `"DB"` |
-| `MEDIA` | R2 | Bucket for image / video uploads. Isolation is via `CLIENT_SLUG` prefix |
+| `MEDIA` | R2 | Bucket for image / video uploads. Default publication uses `edgeletter/<CLIENT_SLUG>/`, others `edgeletter/pub/<publication_id>/` |
+| `EMAIL_QUEUE` | Queue | Campaign fan-out (`edgeletter-email`, DLQ `edgeletter-email-dlq`). Create once with `wrangler queues create`. If unbound, campaigns send inline |
 | `ASSETS` | Static assets | Astro's `dist/` output |
 
 ## Secrets — `wrangler secret put`
@@ -45,6 +49,7 @@ Resolution at request time: **DB row → `wrangler.jsonc` seed → hard-coded de
 | `GMAIL_APP_PASSWORD` | `EMAIL_PROVIDER=GMAIL` | [Gmail App Password](https://support.google.com/accounts/answer/185833) |
 | `TURNSTILE_SECRET` | optional | Turnstile secret for the widget in `TURNSTILE_SITE_KEY`. When set, `/api/subscribe` requires a valid token |
 | `SUBSCRIBE_API_KEY` | optional | Lets your own site subscribe visitors server-to-server: send it as `x-subscribe-key` to `/api/subscribe` and the Turnstile check is skipped (your site runs its own). Same list, double opt-in and dispatch |
+| `RESEND_WEBHOOK_SECRET` | recommended with RESEND | Svix signing secret (`whsec_…`) of a Resend webhook pointed at `/api/webhooks/resend` (events: `email.bounced`, `email.complained`). Hard bounces and complaints land in `email_suppressions` and are never mailed again |
 
 ## Local development (`.dev.vars`)
 

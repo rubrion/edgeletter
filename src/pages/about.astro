@@ -2,15 +2,16 @@
 import Layout from '../layouts/BlogPost.astro';
 import { getLang, useTranslations } from '../i18n';
 import { loadSettings } from '../lib/settings';
+import { sanitizeHtml } from '../lib/sanitize';
 
 const lang = getLang(Astro.request);
 const t = useTranslations(lang);
 
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const clientName = settings.clientName;
 
 const rawBody = lang === 'pt-BR' ? settings.aboutBodyPt : settings.aboutBodyEn;
-const body = rawBody.replaceAll('{name}', clientName);
+const body = sanitizeHtml(rawBody.replaceAll('{name}', clientName));
 
 const title = t('about.title');
 ---

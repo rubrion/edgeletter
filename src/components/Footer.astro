@@ -4,7 +4,7 @@ import { loadSettings } from '../lib/settings';
 import SubscribeForm from './SubscribeForm.astro';
 import Reveal from './Reveal.astro';
 
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const clientName = settings.clientName;
 const today = new Date();
 

@@ -148,7 +148,7 @@ is chosen so a maxed-out free publication costs us cents per month.
 
 ## Phases
 
-**Phase 0 — Make the codebase tenant-ready (no user-visible change)**
+**Phase 0 — Make the codebase tenant-ready (no user-visible change)** — ✅ implemented 2026-11-16
 1. HTML sanitization for posts, About, embed.
 2. Queue-based dispatch with retries; suppression table + provider webhooks.
 3. Add `publications` with one row ("rubrion"); add `publication_id` to

@@ -4,7 +4,7 @@ import LogoMark from '../../components/LogoMark.astro';
 import { loadSettings } from '../../lib/settings';
 
 const error = Astro.url.searchParams.get('error');
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const themeColor = settings.themePrimaryColor;
 const clientName = settings.clientName;
 ---

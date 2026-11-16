@@ -12,7 +12,7 @@ interface Props {
 	publishedAt?: Date | null;
 }
 
-const settings = await loadSettings();
+const settings = await loadSettings(Astro.locals.publication.id);
 const clientName = settings.clientName;
 const customFavicon = settings.clientFaviconUrl || null;
 

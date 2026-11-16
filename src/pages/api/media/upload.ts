@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
+import { mediaPrefix } from "../../../lib/tenant";
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
@@ -19,7 +20,7 @@ const json = (body: unknown, status = 200) =>
     headers: { "Content-Type": "application/json" },
   });
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   const e = env as unknown as {
     MEDIA?: R2Bucket;
     CLIENT_SLUG?: string;
@@ -43,10 +44,9 @@ export const POST: APIRoute = async ({ request }) => {
   if (file.size > MAX_BYTES)
     return json({ error: `file too large (max ${MAX_BYTES} bytes)` }, 413);
 
-  const slug = (e.CLIENT_SLUG ?? "default").trim() || "default";
   const now = new Date();
   const yyyyMm = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  const key = `edgeletter/${slug}/${yyyyMm}/${crypto.randomUUID()}.${ext}`;
+  const key = `${mediaPrefix(locals.publication.id)}/${yyyyMm}/${crypto.randomUUID()}.${ext}`;
 
   await e.MEDIA.put(key, file.stream(), {
     httpMetadata: { contentType: file.type },

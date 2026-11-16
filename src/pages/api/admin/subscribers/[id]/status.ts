@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDbInstance, subscribers } from '../../../../../db';
 
 const VALID = new Set(['active', 'unsubscribed']);
 
-export const POST: APIRoute = async ({ request, params, redirect }) => {
+export const POST: APIRoute = async ({ request, params, redirect, locals }) => {
   const id = params.id;
   const ct = request.headers.get('content-type') ?? '';
   const isJson = ct.includes('application/json');
@@ -38,7 +38,7 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
   await db
     .update(subscribers)
     .set({ status: status as 'active' | 'unsubscribed' })
-    .where(eq(subscribers.id, id));
+    .where(and(eq(subscribers.id, id), eq(subscribers.publicationId, locals.publication.id)));
 
   if (isJson) return Response.json({ ok: true }, { status: 200 });
   return redirect('/admin/subscribers?saved=1', 303);

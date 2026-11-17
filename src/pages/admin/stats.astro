@@ -30,7 +30,8 @@ const [counts] = await db
 const since = Date.now() - 12 * 7 * 24 * 60 * 60 * 1000;
 const weekly = await db
 	.select({
-		week: sql<number>`(${subscribers.createdAt} - ${since}) / ${7 * 24 * 60 * 60 * 1000}`,
+		// CAST: D1 binds JS numbers as REAL, so plain division gives fractional weeks.
+		week: sql<number>`CAST((${subscribers.createdAt} - ${since}) / ${7 * 24 * 60 * 60 * 1000} AS INTEGER)`,
 		n: sql<number>`count(*)`,
 	})
 	.from(subscribers)

@@ -1,12 +1,28 @@
 ---
 import AppLayout from '../../layouts/AppLayout.astro';
 import { emailsThisMonth, formatBytes, limitsFor, mediaBytesUsed, PLAN_LIMITS, PRO_PRICE, subscriberCount } from '../../lib/plans';
-import { stripeEnabled, yearlyEnabled } from '../../lib/stripe';
+import { embeddedEnabled, publishableKey, retrieveCheckout, stripeEnabled, yearlyEnabled } from '../../lib/stripe';
+import { applySubscription } from '../../lib/billing';
 import { getLang } from '../../i18n';
 import { studio } from '../../i18n/studio';
 
 
 const { publication } = Astro.locals as Required<App.Locals>;
+
+// Back from embedded Checkout: confirm with Stripe and apply the plan now,
+// instead of waiting for the webhook (which still arrives and is idempotent).
+const sessionId = Astro.url.searchParams.get('session_id');
+if (sessionId && stripeEnabled()) {
+	const session = await retrieveCheckout(sessionId).catch(() => null);
+	if (session && session.client_reference_id === publication.id) {
+		if (session.status === 'complete' && session.subscription) {
+			await applySubscription(session.subscription, publication.id).catch((err) => console.error('checkout return', err));
+			return Astro.redirect('/billing?upgraded=1', 303);
+		}
+		if (session.status === 'open') return Astro.redirect('/billing?checkout=incomplete', 303);
+	}
+	return Astro.redirect('/billing', 303);
+}
 const limits = limitsFor(publication);
 const [emails, subs, media] = await Promise.all([
 	emailsThisMonth(publication.id),
@@ -19,6 +35,8 @@ const loc = lang === 'pt-BR' ? 'pt-BR' : 'en-US';
 const pct = (a: number, b: number) => `${Math.min(100, Math.round((a / Math.max(1, b)) * 100))}%`;
 const error = Astro.url.searchParams.get('error') ? t('bill.notConfigured') : null;
 const upgraded = Astro.url.searchParams.get('upgraded') === '1';
+const incomplete = Astro.url.searchParams.get('checkout') === 'incomplete';
+const embedded = embeddedEnabled();
 const pro = publication.plan === 'pro';
 ---
 
@@ -29,7 +47,8 @@ const pro = publication.plan === 'pro';
 			<h1>{pro ? t('bill.pro') : t('bill.free')}</h1>
 			<p class="sub">{limits.probation ? t('bill.probation') : pro ? t('bill.thanks') : t('bill.upgradeLead')}</p>
 		</header>
-		{upgraded && !pro && <div class="alert ok">{t('bill.paid')}</div>}
+		{upgraded && (pro ? <div class="alert ok">{t('bill.welcomePro')}</div> : <div class="alert ok">{t('bill.paid')}</div>)}
+		{incomplete && <div class="alert err">{t('bill.incomplete')}</div>}
 		{error && <div class="alert err">{error}</div>}
 
 		<h2>{t('bill.month')}</h2>
@@ -53,18 +72,101 @@ const pro = publication.plan === 'pro';
 				</dl>
 				<p style="margin:1.5rem 0 0.25rem"><strong>{t('bill.price', { brl: PRO_PRICE.monthly.brl })}</strong> <span class="muted">{t('bill.priceNote', { usd: PRO_PRICE.monthly.usd })}</span></p>
 				<div class="row" style="margin-top:1rem">
-					<form method="post" action="/api/billing/checkout" class="inline-form">
+					<form method="post" action="/api/billing/checkout" class="inline-form" data-checkout="month">
 						<input type="hidden" name="interval" value="month" />
 						<button type="submit" disabled={!stripeEnabled()}>{stripeEnabled() ? t('bill.monthly') : t('bill.soon')}</button>
 					</form>
 					{yearlyEnabled() && (
-						<form method="post" action="/api/billing/checkout" class="inline-form">
+						<form method="post" action="/api/billing/checkout" class="inline-form" data-checkout="year">
 							<input type="hidden" name="interval" value="year" />
 							<button type="submit">{t('bill.yearly', { brl: PRO_PRICE.yearly.brl, usd: PRO_PRICE.yearly.usd })}</button>
 						</form>
 					)}
 				</div>
+				{embedded && (
+					<section class="checkout-panel" id="checkout-panel" hidden>
+						<div class="checkout-head">
+							<span class="eyebrow" style="text-align:left">{t('bill.secure')}</span>
+							<button type="button" class="link-btn" id="checkout-close">{t('bill.cancel')}</button>
+						</div>
+						<p class="checkout-status muted" id="checkout-status">{t('bill.loading')}</p>
+						<div id="checkout"></div>
+					</section>
+				)}
 			</>
 		)}
 	</div>
+
+	{embedded && !pro && (
+		<>
+			<script is:inline src="https://js.stripe.com/v3/" async></script>
+			<script
+				is:inline
+				define:vars={{ pk: publishableKey(), errMsg: t('bill.checkoutError'), loading: t('bill.loading'), locale: lang === 'pt-BR' ? 'pt-BR' : 'en' }}
+			>
+				const panel = document.getElementById('checkout-panel');
+				const status = document.getElementById('checkout-status');
+				const forms = document.querySelectorAll('form[data-checkout]');
+				let instance = null;
+
+				const waitForStripe = () =>
+					new Promise((resolve, reject) => {
+						let n = 0;
+						const tick = () => (window.Stripe ? resolve(window.Stripe) : ++n > 100 ? reject(new Error('stripe.js')) : setTimeout(tick, 50));
+						tick();
+					});
+
+				const close = () => {
+					if (instance) { instance.destroy(); instance = null; }
+					panel.hidden = true;
+					forms.forEach((f) => (f.querySelector('button').disabled = false));
+				};
+				document.getElementById('checkout-close').addEventListener('click', close);
+
+				forms.forEach((form) =>
+					form.addEventListener('submit', async (e) => {
+						e.preventDefault();
+						if (instance) close();
+						forms.forEach((f) => (f.querySelector('button').disabled = true));
+						panel.hidden = false;
+						status.hidden = false;
+						status.textContent = loading;
+						panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+						try {
+							const Stripe = await waitForStripe();
+							const stripe = Stripe(pk, { locale });
+							const fetchClientSecret = async () => {
+								const res = await fetch('/api/billing/checkout', {
+									method: 'POST',
+									headers: { 'Content-Type': 'application/json' },
+									credentials: 'same-origin',
+									body: JSON.stringify({ interval: form.dataset.checkout }),
+								});
+								const j = await res.json().catch(() => ({}));
+								if (!res.ok || !j.clientSecret) throw new Error(j.error || String(res.status));
+								return j.clientSecret;
+							};
+							const create = (stripe.createEmbeddedCheckoutPage || stripe.initEmbeddedCheckout).bind(stripe);
+							instance = await create({ fetchClientSecret });
+							status.hidden = true;
+							instance.mount('#checkout');
+						} catch (err) {
+							console.error(err);
+							status.textContent = errMsg;
+							forms.forEach((f) => (f.querySelector('button').disabled = false));
+						}
+					}),
+				);
+			</script>
+		</>
+	)}
+
+	<style>
+		.checkout-panel { margin-top: 1.75rem; padding-top: 1.25rem; border-top: var(--hairline); scroll-margin-top: 1.5rem; }
+		.checkout-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem; }
+		.link-btn { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 0.9rem; text-decoration: underline; cursor: pointer; box-shadow: none; }
+		.link-btn:hover { color: var(--accent); background: none; }
+		.checkout-status { font-style: italic; }
+		#checkout { min-height: 2rem; border-radius: 6px; overflow: hidden; }
+	</style>
 </AppLayout>

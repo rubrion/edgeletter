@@ -1,9 +1,6 @@
 import type { APIRoute } from 'astro';
-import { eq } from 'drizzle-orm';
-import { getDbInstance, publications } from '../../../db';
-import { retrieveSubscription, verifyStripeSignature, webhookSecret } from '../../../lib/stripe';
-import { invalidatePublicationCache } from '../../../lib/tenant';
-import { releaseHostname } from '../../../lib/custom-hostnames';
+import { applySubscription } from '../../../lib/billing';
+import { verifyStripeSignature, webhookSecret } from '../../../lib/stripe';
 
 type StripeObject = {
   id?: string;
@@ -13,8 +10,6 @@ type StripeObject = {
   client_reference_id?: string;
   metadata?: { publication_id?: string };
 };
-
-const ACTIVE = new Set(['active', 'trialing', 'past_due']);
 
 /**
  * Stripe → publications.plan. Checkout completion upgrades; subscription
@@ -29,32 +24,6 @@ export const POST: APIRoute = async ({ request }) => {
   }
   const event = JSON.parse(body) as { type?: string; data?: { object?: StripeObject } };
   const obj = event.data?.object ?? {};
-  const db = getDbInstance();
-
-  const setPlan = async (where: ReturnType<typeof eq>, patch: Partial<typeof publications.$inferInsert>) => {
-    await db.update(publications).set(patch).where(where);
-    invalidatePublicationCache();
-  };
-
-  // Webhooks can arrive late or out of order, so subscription events are never
-  // applied from the payload: re-read the subscription's current state instead.
-  const applySubscription = async (subscriptionId: string, pubIdHint?: string) => {
-    const sub = await retrieveSubscription(subscriptionId);
-    const pubId = sub?.metadata?.publication_id ?? pubIdHint;
-    const where = pubId ? eq(publications.id, pubId) : eq(publications.stripeSubscriptionId, subscriptionId);
-    const pro = !!sub && ACTIVE.has(sub.status);
-    if (!pro) {
-      // Custom domains are Pro-only and billed per hostname: release on downgrade.
-      const held = await db.select({ id: publications.id, cfHostnameId: publications.cfHostnameId }).from(publications).where(where);
-      for (const h of held) if (h.cfHostnameId) await releaseHostname(h.id, h.cfHostnameId);
-    }
-    await setPlan(where, {
-      plan: pro ? 'pro' : 'free',
-      stripeSubscriptionId: pro ? subscriptionId : null,
-      ...(sub?.customer ? { stripeCustomerId: sub.customer } : {}),
-    });
-  };
-
   switch (event.type) {
     case 'checkout.session.completed': {
       const pubId = obj.metadata?.publication_id ?? obj.client_reference_id;

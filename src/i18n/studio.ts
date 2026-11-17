@@ -212,6 +212,12 @@ const en = {
   'bill.yearly': 'Yearly — {brl} ({usd}), 2 months free',
   'bill.soon': 'Upgrades open soon',
   'bill.notConfigured': 'Billing is not configured yet.',
+  'bill.welcomePro': 'Welcome to Pro — your new limits are active.',
+  'bill.incomplete': 'Payment was not completed. You can try again below.',
+  'bill.secure': 'Secure payment by Stripe',
+  'bill.cancel': 'Cancel',
+  'bill.loading': 'Loading payment form…',
+  'bill.checkoutError': 'Could not load the payment form. Try again in a moment.',
 
   // domain
   'dom.eyebrow': 'Your own address',
@@ -672,6 +678,12 @@ const pt: Record<Key, string> = {
   'bill.yearly': 'Anual — {brl} ({usd}), 2 meses grátis',
   'bill.soon': 'Assinaturas em breve',
   'bill.notConfigured': 'A cobrança ainda não está configurada.',
+  'bill.welcomePro': 'Bem-vindo ao Pro: seus novos limites já estão ativos.',
+  'bill.incomplete': 'O pagamento não foi concluído. Você pode tentar de novo abaixo.',
+  'bill.secure': 'Pagamento seguro pela Stripe',
+  'bill.cancel': 'Cancelar',
+  'bill.loading': 'Carregando o formulário de pagamento…',
+  'bill.checkoutError': 'Não foi possível carregar o pagamento. Tente de novo em instantes.',
 
   'dom.eyebrow': 'Seu próprio endereço',
   'dom.heading': 'Domínio próprio',

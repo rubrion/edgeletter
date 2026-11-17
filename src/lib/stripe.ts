@@ -12,10 +12,15 @@ type StripeEnv = {
   STRIPE_PRICE_PRO_YEARLY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PORTAL_CONFIG?: string;
+  /** Public key for Stripe.js (embedded Checkout). Safe to ship to browsers. */
+  STRIPE_PUBLISHABLE_KEY?: string;
 };
 const cfg = () => env as unknown as StripeEnv;
 
 export const stripeEnabled = (): boolean => !!cfg().STRIPE_SECRET_KEY && !!cfg().STRIPE_PRICE_PRO;
+export const publishableKey = (): string | undefined => cfg().STRIPE_PUBLISHABLE_KEY;
+export const embeddedEnabled = (): boolean => stripeEnabled() && !!cfg().STRIPE_PUBLISHABLE_KEY;
+
 export const yearlyEnabled = (): boolean => stripeEnabled() && !!cfg().STRIPE_PRICE_PRO_YEARLY;
 
 /** Stripe's form encoding: nested keys as a[b][c]=v. */
@@ -46,21 +51,38 @@ export const createCheckout = (input: {
   interval: 'month' | 'year';
   customerId: string | null;
   email: string;
-  successUrl: string;
-  cancelUrl: string;
+  /** Hosted page: success/cancel. Embedded: Stripe redirects to returnUrl. */
+  successUrl?: string;
+  cancelUrl?: string;
+  returnUrl?: string;
 }) =>
-  call<{ url: string }>('checkout/sessions', {
+  call<{ url?: string; client_secret?: string }>('checkout/sessions', {
     mode: 'subscription',
     'line_items[0][price]': input.interval === 'year' && cfg().STRIPE_PRICE_PRO_YEARLY ? cfg().STRIPE_PRICE_PRO_YEARLY : cfg().STRIPE_PRICE_PRO,
     'line_items[0][quantity]': 1,
     client_reference_id: input.publicationId,
     ...(input.customerId ? { customer: input.customerId } : { customer_email: input.email }),
-    success_url: input.successUrl,
-    cancel_url: input.cancelUrl,
+    ...(input.returnUrl
+      ? { ui_mode: 'embedded_page', return_url: input.returnUrl }
+      : { success_url: input.successUrl, cancel_url: input.cancelUrl }),
     allow_promotion_codes: 'true',
     metadata: { publication_id: input.publicationId },
     subscription_data: { metadata: { publication_id: input.publicationId } },
   });
+
+/** A Checkout session's outcome (embedded return page). */
+export const retrieveCheckout = async (id: string) => {
+  const res = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${cfg().STRIPE_SECRET_KEY}` },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as {
+    id: string;
+    status: 'open' | 'complete' | 'expired';
+    subscription: string | null;
+    client_reference_id: string | null;
+  };
+};
 
 /** Current state of a subscription, straight from Stripe. */
 export const retrieveSubscription = async (id: string) => {

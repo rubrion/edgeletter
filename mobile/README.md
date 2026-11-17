@@ -44,26 +44,13 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 ### One-time setup
 
-1. **GitHub:**
-   - Install the `rubrion` GitHub App (id 1117691, Contents: read & write) on `rubrion/edgeletter`.
-   - Set the secret and variable:
-     ```sh
-     infisical secrets get AUTOMATION_APP_PRIVATE_KEY --projectId 4dbb5673-ad94-406d-9363-4634c8763afa --env prod --path /github-app --plain --silent --domain https://infisical.rubrion.ai/api | gh secret set AUTOMATION_APP_PRIVATE_KEY -R rubrion/edgeletter
-     gh variable set AUTO_RELEASE --body true -R rubrion/edgeletter
-     ```
-2. **Codemagic:**
-   - Add the repo as an app.
-   - Create the env group `edgeletter` with `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` (the Play service-account JSON, granted access to `blog.edgeletter`).
-   - The `rubrion-release` keystore is already team-level.
-3. **Worker secrets** for Play review (reviewers can't receive our email). Keep them in Infisical too.
-   ```sh
-   wrangler secret put REVIEW_EMAIL   # e.g. a review@ address; create its publication first
-   wrangler secret put REVIEW_CODE    # 10+ digits (fixed code; rate-limited 5/min)
-   ```
-4. **Play Console** (app `blog.edgeletter`):
-   - **Privacy policy URL.**
-   - **App access:** reviewer instructions. Enter `REVIEW_EMAIL`, press send, then type `REVIEW_CODE`.
-   - **Data safety:** email address, the content users write, and subscriber emails they import.
-   - **Account deletion URL:** `https://app.edgeletter.blog/delete-account`. Deletion itself is in the app under **Account**.
-   - **Store listing:** title, descriptions, `store/icon-512.png`, `store/feature-1024x500.png`, and phone screenshots taken from the app (1080×1920).
-   - **First production release:** upload the AAB artifact by hand as a draft once. After that, the scripted releases work.
+Already done (2026-11-16):
+- **GitHub:** the `rubrion` App is installed org-wide; `AUTOMATION_APP_PRIVATE_KEY` secret and `AUTO_RELEASE=true` set on `rubrion/edgeletter`; baseline tag `app-v1.0.0`.
+- **Worker:** `REVIEW_EMAIL` / `REVIEW_CODE` secrets set (also in Infisical, Edgeletter `prod:/worker`). The review account owns a demo publication, *Play Review* (`playreview`).
+- **Web:** privacy policy at https://edgeletter.blog/privacy, deletion page at https://app.edgeletter.blog/delete-account.
+
+Left to do:
+1. **Play Console:** create the app `blog.edgeletter` and fill the forms with `store/play-console.md`. Give the Play service account (the one Codemagic's `rubry` group uses, or a new one) access to the app.
+2. **Codemagic:** add `rubrion/edgeletter` as an app, create the env group `edgeletter` with `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` (that service account's JSON), and run *EdgeLetter · Android · Google Play (AAB)* on `main`. The `rubrion-release` keystore is team-level already.
+3. **First release:** Play needs the first bundle uploaded by hand. Download `app-release.aab` from that Codemagic run, upload it to Internal testing, then later runs publish by themselves.
+4. **Stripe (recommended):** give the Worker's restricted key *Subscriptions: Write* so account deletion cancels Pro subscriptions itself. Until then, staff get an email to cancel them by hand.

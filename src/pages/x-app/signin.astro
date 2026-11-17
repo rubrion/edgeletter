@@ -34,14 +34,15 @@ if (form && form.get('action') === 'code') {
 	email = normalizeEmail(String(form.get('email') ?? ''));
 	const code = String(form.get('code') ?? '').replace(/\s+/g, '');
 	sent = true;
-	let ok = isReviewLogin(env as unknown as { REVIEW_EMAIL?: string; REVIEW_CODE?: string }, email, code);
-	if (!ok) {
-		if (!EMAIL_RE.test(email) || !(await allow(`signin:code:${email}`)) || !(await allow(`signin:ip:${clientIp(Astro.request)}`))) {
-			error = t('common.tooMany');
-		} else {
-			ok = !!(await consumeLoginCode(email, code));
-			if (!ok) error = t('signin.errCode');
-		}
+	let ok = false;
+	// Rate-limited before any check, the fixed review code included.
+	if (!EMAIL_RE.test(email) || !(await allow(`signin:code:${email}`)) || !(await allow(`signin:ip:${clientIp(Astro.request)}`))) {
+		error = t('common.tooMany');
+	} else {
+		ok =
+			isReviewLogin(env as unknown as { REVIEW_EMAIL?: string; REVIEW_CODE?: string }, email, code) ||
+			!!(await consumeLoginCode(email, code));
+		if (!ok) error = t('signin.errCode');
 	}
 	if (ok) {
 		const user = await findOrCreateUser(email);
@@ -97,7 +98,7 @@ if (form && form.get('action') === 'code') {
 					<input type="hidden" name="next" value={next} />
 					<div class="field">
 						<label for="code">{t('signin.code')}</label>
-						<input id="code" name="code" type="text" required inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7" autocomplete="one-time-code" autofocus style="font-size:1.5rem;letter-spacing:0.3em;text-align:center" />
+						<input id="code" name="code" type="text" required inputmode="numeric" pattern="[0-9 ]{6,12}" maxlength="12" autocomplete="one-time-code" autofocus style="font-size:1.5rem;letter-spacing:0.3em;text-align:center" />
 					</div>
 					<button type="submit" style="width:100%;margin-top:0.5rem">{t('signin.codeSubmit')}</button>
 				</form>

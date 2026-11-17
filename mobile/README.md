@@ -58,7 +58,7 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 3. **Worker secrets** for Play review (reviewers can't receive our email). Keep them in Infisical too.
    ```sh
    wrangler secret put REVIEW_EMAIL   # e.g. a review@ address; create its publication first
-   wrangler secret put REVIEW_CODE    # at least 6 digits
+   wrangler secret put REVIEW_CODE    # 10+ digits (fixed code; rate-limited 5/min)
    ```
 4. **Play Console** (app `blog.edgeletter`):
    - **Privacy policy URL.**

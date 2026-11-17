@@ -1,0 +1,123 @@
+# EdgeLetter Android app pipeline (Codemagic), from the org template
+# rubrion/.github templates/capacitor-store-app/codemagic.yaml (live reference:
+# rubrion/rubry-monorepo/codemagic.yaml). Builds the signed AAB of mobile/ and
+# publishes it to Google Play. Builds are started by hand in Codemagic.
+#
+# Release notes: mobile/store/whatsnew/<locale>.txt (en-US, pt-BR), at most 500
+# characters each. Edit them before each store build: they become Play's
+# "What's new".
+#
+# Version: mobile/package.json "version" is the version name (auto-bumped by
+# .github/workflows/release.yml); the build number is Play's latest + 1
+# (Codemagic's build counter if higher), so Play never sees a reused number.
+#
+# Credentials:
+#   - Android keystore `rubrion-release`: team-level, shared across the org's
+#     apps. It is Play's UPLOAD key; Play App Signing re-signs.
+#   - Env group `edgeletter` with one secure variable:
+#       GCLOUD_SERVICE_ACCOUNT_CREDENTIALS  the Play service-account JSON (whole
+#                                           file), with access to blog.edgeletter.
+
+workflows:
+
+  android-playstore:
+    name: EdgeLetter · Android · Google Play (AAB)
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 22
+      java: 21
+      android_signing:
+        - rubrion-release
+      groups:
+        - edgeletter
+      vars:
+        PACKAGE_NAME: blog.edgeletter
+
+    working_directory: mobile
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install -g bun
+          bun install --frozen-lockfile
+
+      - name: Sync Capacitor
+        script: bunx cap sync android
+
+      # Codemagic injects CM_KEYSTORE_PATH / CM_KEYSTORE_PASSWORD / CM_KEY_ALIAS /
+      # CM_KEY_PASSWORD from the `rubrion-release` identity; Gradle reads
+      # android/key.properties (android/app/build.gradle).
+      - name: Set up release signing
+        script: |
+          cat > android/key.properties <<EOF
+          storeFile=$CM_KEYSTORE_PATH
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          keyPassword=$CM_KEY_PASSWORD
+          EOF
+
+      - name: Set version
+        script: |
+          # The higher of Play's latest + 1 and Codemagic's build counter: a
+          # bundle uploaded by a run whose release failed isn't on any track,
+          # so "latest" can miss it, and Play rejects a reused versionCode.
+          LATEST=$(google-play get-latest-build-number --package-name "$PACKAGE_NAME" 2>/dev/null || echo "")
+          VERSION_CODE=$BUILD_NUMBER
+          if [ -n "$LATEST" ] && [ "$LATEST" -ge 0 ] 2>/dev/null && [ $((LATEST + 1)) -gt "$VERSION_CODE" ]; then
+            VERSION_CODE=$((LATEST + 1))
+          fi
+          VERSION_NAME=$(node -p "require('./package.json').version")
+          echo "VERSION_CODE=$VERSION_CODE" >> "$CM_ENV"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$CM_ENV"
+          echo "EdgeLetter $VERSION_NAME ($VERSION_CODE)"
+
+      - name: Release notes
+        script: |
+          # store/whatsnew/<locale>.txt -> fastlane's changelog for this
+          # versionCode (Play's "What's new", 500 characters at most).
+          for f in store/whatsnew/*.txt; do
+            loc=$(basename "$f" .txt)
+            mkdir -p "fastlane/metadata/android/$loc/changelogs"
+            head -c 500 "$f" > "fastlane/metadata/android/$loc/changelogs/$VERSION_CODE.txt"
+            echo "--- $loc ---"; cat "fastlane/metadata/android/$loc/changelogs/$VERSION_CODE.txt"
+          done
+
+      - name: Build release AAB
+        script: cd android && ./gradlew bundleRelease
+
+      - name: Publish AAB to Google Play
+        script: |
+          # Track follows the branch (declarative publishing can't read a runtime
+          # var): production branch -> production track, else -> internal.
+          if [ "$CM_BRANCH" = "production" ]; then TRACK=production; else TRACK=internal; fi
+          echo "Publishing $PACKAGE_NAME to track: $TRACK"
+          printf '%s' "$GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" > play-key.json
+          fastlane supply \
+            --package_name "$PACKAGE_NAME" \
+            --aab android/app/build/outputs/bundle/release/app-release.aab \
+            --track "$TRACK" \
+            --release_status completed \
+            --json_key play-key.json \
+            --metadata_path fastlane/metadata/android \
+            --skip_upload_metadata true \
+            --skip_upload_images true \
+            --skip_upload_screenshots true
+          rm -f play-key.json
+
+    artifacts:
+      - android/app/build/outputs/bundle/release/app-release.aab
+      - fastlane/metadata/android/*/changelogs/*.txt
+
+    publishing:
+      # If blog.edgeletter has never had a production release, Google may require
+      # the first one as a draft ("Only releases with status draft may be created
+      # on draft app"): upload the .aab artifact manually in Play Console once,
+      # then the scripted `completed` releases work.
+      email:
+        recipients:
+          - hello@rubrion.ai
+        notify:
+          success: true
+          failure: true

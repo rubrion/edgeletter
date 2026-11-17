@@ -1,0 +1,32 @@
+name: Release
+
+# Auto-bump the Android app's semantic version (mobile/package.json) from
+# Conventional Commits and tag it (app-vX.Y.Z), via the rubrion shared engine
+# (rubrion/.github). No PRs, no PATs. Store builds run on Codemagic
+# (codemagic.yaml) and read that version.
+#
+# Off until the one-time setup is done: the rubrion App installed on this
+# repo, the AUTOMATION_APP_PRIVATE_KEY secret and the AUTO_RELEASE=true
+# variable (see mobile/README.md).
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/release.yml'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    if: ${{ vars.AUTO_RELEASE == 'true' }}
+    uses: rubrion/.github/.github/workflows/mobile-version-bump.yml@main
+    with:
+      app-dir: mobile
+      tag-prefix: app-v
+    secrets:
+      app-private-key: ${{ secrets.AUTOMATION_APP_PRIVATE_KEY }}

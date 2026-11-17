@@ -1,0 +1,37 @@
+# Promote: move `production` forward to a commit of `main`. Codemagic builds of
+# the `production` branch publish the Android app to Play's production track
+# (every other branch goes to internal testing; see codemagic.yaml).
+# Run it from the Actions tab, or `gh workflow run promote` (add `-f commit=<sha>`
+# for an earlier commit of main). Fast-forward only: it refuses anything that
+# isn't on main or would move production backwards.
+name: promote
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit of main to promote (empty = the latest)
+        required: false
+        default: ""
+permissions:
+  contents: write
+concurrency: promote
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fast-forward production
+        env:
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          target=$(git rev-parse "${COMMIT:-origin/main}^{commit}")
+          git merge-base --is-ancestor "$target" origin/main || { echo "::error::$target is not on main"; exit 1; }
+          if git rev-parse --verify -q origin/production >/dev/null; then
+            git merge-base --is-ancestor origin/production "$target" || { echo "::error::production is ahead of $target or has diverged"; exit 1; }
+            if [ "$(git rev-parse origin/production)" = "$target" ]; then echo "production is already at $target"; exit 0; fi
+            echo "Promoting:"; git log --oneline origin/production.."$target"
+          fi
+          git push origin "$target:refs/heads/production"
+          echo "production -> $(git rev-parse --short "$target")" >> "$GITHUB_STEP_SUMMARY"

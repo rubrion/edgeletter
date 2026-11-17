@@ -1,6 +1,6 @@
 {
   "name": "edgeletter-app",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "EdgeLetter for Android: a Capacitor shell around app.edgeletter.blog, so the app updates with every web deploy.",
   "private": true,
   "scripts": {

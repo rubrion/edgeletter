@@ -110,6 +110,10 @@ export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [aiUsage, setAiUsage] = useState<AiUsage | null>(initialAiUsage);
+  // Phones (<= 900px, see admin/index.astro): the post list and the editor are
+  // separate screens, and writing and preview take turns.
+  const [pane, setPane] = useState<'list' | 'editor'>(opened ? 'editor' : 'list');
+  const [view, setView] = useState<'write' | 'preview'>('write');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -187,12 +191,16 @@ export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en
     });
     setSlugDirty(true);
     setMessage(null);
+    setPane('editor');
+    setView('write');
   };
 
   const newPost = () => {
     setDraft(blank);
     setSlugDirty(false);
     setMessage(null);
+    setPane('editor');
+    setView('write');
   };
 
   const submit = async (publish: boolean) => {
@@ -365,8 +373,8 @@ export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en
   };
 
   return (
-    <div style={styles.shell}>
-      <aside style={styles.sidebar}>
+    <div style={styles.shell} className="ed-shell" data-pane={pane}>
+      <aside style={styles.sidebar} className="ed-sidebar">
         <button onClick={newPost} style={styles.newBtn}>
           {t('nav.newPost')}
         </button>
@@ -394,9 +402,10 @@ export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en
           ))}
         </div>
       </aside>
-      <main style={styles.main}>
-        <div style={styles.fields}>
+      <main style={styles.main} className="ed-main">
+        <div style={styles.fields} className="ed-fields">
           <input
+            className="ed-title"
             type="text"
             placeholder={t('ed.titlePh')}
             value={draft.title}
@@ -412,9 +421,22 @@ export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en
               setDraft((d) => ({ ...d, slug: e.target.value }));
             }}
             style={styles.slugInput}
+            className="ed-slug"
           />
         </div>
-        <div style={styles.toolbar}>
+        <div style={styles.toolbar} className="ed-toolbar">
+          <button type="button" className="ed-mobile" onClick={() => setPane('list')} style={styles.toolBtn}>
+            {t('ed.backToPosts')}
+          </button>
+          <button
+            type="button"
+            className="ed-mobile"
+            onClick={() => setView((v) => (v === 'write' ? 'preview' : 'write'))}
+            style={styles.toolBtn}
+          >
+            {view === 'write' ? t('ed.previewTab') : t('ed.write')}
+          </button>
+          <span style={styles.toolDivider} className="ed-mobile" />
           <button
             type="button"
             onClick={handleUndo}
@@ -465,10 +487,11 @@ export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en
           >
             {busy === 'reviewing' ? t('ed.reviewing') : t('ed.review')}
           </button>
-          <span style={styles.toolHint}>{t('ed.dropHint')}</span>
+          <span style={styles.toolHint} className="ed-hint">{t('ed.dropHint')}</span>
         </div>
-        <div style={styles.split}>
+        <div style={styles.split} className="ed-split" data-view={view}>
           <textarea
+            className="ed-write"
             ref={textareaRef}
             placeholder={t('ed.bodyPh')}
             value={draft.contentMd}
@@ -502,7 +525,7 @@ export default function AdminEditor({ recent, initialAiUsage, openId, lang = 'en
           />
           <div style={styles.preview} className="ed-preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
         </div>
-        <div style={styles.actions}>
+        <div style={styles.actions} className="ed-actions">
           {aiUsage && (
             <span
               style={{

@@ -31,8 +31,8 @@
 		// Platform ceiling on AI review tokens per UTC day (~US$0.40/day).
 		"AI_PLATFORM_DAILY_TOKENS": "300000",
 		"MEDIA_PUBLIC_BASE": "https://media.rubrion.ai",
-		// Stripe.js publishable key (public). Swap for pk_live_ when billing goes live.
-		"STRIPE_PUBLISHABLE_KEY": "pk_test_51USlebQtpVVMufZy1dTBTIVsQyGJ9YJVbYn9DvISnBvlq1ibUMfgeFGIsRS5439uGIVPb6jp5qgoc77xwsHdXExu00TT5RghzL",
+		// Stripe.js publishable key (public, live mode).
+		"STRIPE_PUBLISHABLE_KEY": "pk_live_51USlebQtpVVMufZyqm6azRronHD5H8OjdQI4OKskPHkFohsQjOspdqZSvXFzmXR0RPSH672Yozun563QyZcxj1wY00IJvnBSFR",
 		"TURNSTILE_SITE_KEY": "0x4AAAAAADMKgjDCOeL0zVJj",
 	},
 	// 17 4 * * *: release unused custom hostnames · */30: import RSS/Atom feeds.

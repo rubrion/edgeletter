@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import { bearer, membershipsOf, PUB_COOKIE, rememberPublication, roleIn, sessionUser, verifyApiKey } from './lib/auth';
+import { inStoreApp } from './lib/native';
 import { normalizePath, under } from './lib/paths';
 import { platformOrigin, publicationById, publicationOrigin, resolveHost, TenantLookupError } from './lib/tenant';
 
@@ -55,7 +56,8 @@ const isOwnerOnly = (path: string): boolean =>
   under(path, '/import');
 
 /** App pages that work without a session. */
-const isPublicAppPath = (path: string): boolean => path === '/signin' || under(path, '/auth');
+const isPublicAppPath = (path: string): boolean =>
+  path === '/signin' || path === '/delete-account' || under(path, '/auth');
 
 /** App pages (outside /admin) that act on the active publication. */
 const needsPublicationInApp = (path: string): boolean =>
@@ -75,6 +77,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const { request, url, cookies, redirect, locals } = context;
   const path = normalizePath(url.pathname);
   const secure = url.protocol === 'https:';
+  locals.inApp = inStoreApp(request);
 
   // Internal page trees are only reachable through a host rewrite.
   if (under(path, '/x-platform') || under(path, '/x-app')) return page(404, 'Not found', 'There is nothing here.');
@@ -131,6 +134,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
         if ((origin && origin !== url.origin) || (site && site !== 'same-origin' && site !== 'none')) {
           return jsonError(403, 'cross-origin request');
         }
+      }
+
+      // Store app: no plans or checkout (Play billing policy, src/lib/native.ts).
+      if (locals.inApp && (under(path, '/billing') || under(path, '/api/billing'))) {
+        return under(path, '/api') ? jsonError(403, 'not available in the app') : redirect('/', 302);
       }
 
       const user = await sessionUser(cookies);

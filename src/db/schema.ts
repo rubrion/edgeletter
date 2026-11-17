@@ -230,8 +230,12 @@ export const loginTokens = sqliteTable('login_tokens', {
   role: text('role', { enum: ['owner', 'editor'] }),
   expiresAt: ts('expires_at').notNull(),
   usedAt: ts('used_at'),
+  /** sha256 of `<id>:<6-digit code>` (sign-in codes only; invites have none). */
+  codeHash: text('code_hash'),
+  /** Wrong codes tried; the token is burnt at CODE_MAX_ATTEMPTS. */
+  attempts: integer('attempts').notNull().default(0),
   createdAt: ts('created_at').notNull().$defaultFn(now),
-});
+}, (t) => ({ login_tokens_email_idx: index('login_tokens_email_idx').on(t.email, t.createdAt) }));
 
 export const oauthAccounts = sqliteTable(
   'oauth_accounts',

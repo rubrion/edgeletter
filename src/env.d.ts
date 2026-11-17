@@ -11,5 +11,7 @@ declare namespace App {
 		user?: import("./db").User;
 		/** The user's role in `publication` (app host only). */
 		role?: import("./db").Role;
+		/** Request comes from the store app (src/lib/native.ts): hide all purchases. */
+		inApp: boolean;
 	}
 }

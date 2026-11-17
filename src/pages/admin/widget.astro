@@ -130,7 +130,7 @@ const turnstileEnabled =
               {t('wid.hideWm')}
             </label>
           </div>
-          <div class="hint">{isPro ? t('wid.wmPro') : t('wid.wmFree')}</div>
+          <div class="hint">{isPro ? t('wid.wmPro') : Astro.locals.inApp ? t('wid.wmLocked') : t('wid.wmFree')}</div>
         </div>
 
         <h2>{t('wid.cors')}</h2>

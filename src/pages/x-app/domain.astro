@@ -80,7 +80,7 @@ if (row.cfHostnameId && row.pendingDomain && customDomainsEnabled()) {
 		{!customDomainsEnabled() ? (
 			<p class="empty">{t('dom.unavailable')}</p>
 		) : !allowed ? (
-			<p>{t('dom.proOnly')} <a href="/billing">{t('dom.seePlans')}</a>.</p>
+			Astro.locals.inApp ? <p class="empty">{t('dom.notOnPlan')}</p> : <p>{t('dom.proOnly')} <a href="/billing">{t('dom.seePlans')}</a>.</p>
 		) : row.pendingDomain ? (
 			<div class="stack">
 				<dl class="kv">

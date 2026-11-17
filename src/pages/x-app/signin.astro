@@ -2,7 +2,7 @@
 import { env } from 'cloudflare:workers';
 import { safeNext } from '../../lib/redirects';
 import AppLayout from '../../layouts/AppLayout.astro';
-import { EMAIL_RE, issueLoginToken, normalizeEmail } from '../../lib/auth';
+import { consumeLoginCode, EMAIL_RE, findOrCreateUser, isReviewLogin, issueSignIn, normalizeEmail, startSession } from '../../lib/auth';
 import { sendLoginLink } from '../../lib/auth-email';
 import { googleEnabled } from '../../lib/google';
 import { allow, clientIp } from '../../lib/ratelimit';
@@ -18,6 +18,7 @@ const next = safeNext(Astro.url.searchParams.get('next'), Astro.url.origin);
 if (Astro.locals.user) return Astro.redirect(next);
 
 let sent = false;
+let email = '';
 // Errors from other steps arrive as stable codes (?error=link|google|interrupted).
 const codes: Record<string, Parameters<typeof t>[0]> = { link: 'signin.errLink', google: 'signin.errGoogle', interrupted: 'signin.errGoogleInterrupted' };
 const code = Astro.url.searchParams.get('error');
@@ -25,9 +26,33 @@ let error: string | null = code ? (codes[code] ? t(codes[code]) : null) : null;
 const turnstile = isTurnstileEnabled(env);
 const siteKey = (env as unknown as { TURNSTILE_SITE_KEY?: string }).TURNSTILE_SITE_KEY ?? '';
 
-if (Astro.request.method === 'POST') {
-	const form = await Astro.request.formData();
-	const email = normalizeEmail(String(form.get('email') ?? ''));
+const form = Astro.request.method === 'POST' ? await Astro.request.formData() : null;
+
+if (form && form.get('action') === 'code') {
+	// Second step: the 6-digit code from the email (the store app's way in,
+	// since links in the email open the system browser).
+	email = normalizeEmail(String(form.get('email') ?? ''));
+	const code = String(form.get('code') ?? '').replace(/\s+/g, '');
+	sent = true;
+	let ok = isReviewLogin(env as unknown as { REVIEW_EMAIL?: string; REVIEW_CODE?: string }, email, code);
+	if (!ok) {
+		if (!EMAIL_RE.test(email) || !(await allow(`signin:code:${email}`)) || !(await allow(`signin:ip:${clientIp(Astro.request)}`))) {
+			error = t('common.tooMany');
+		} else {
+			ok = !!(await consumeLoginCode(email, code));
+			if (!ok) error = t('signin.errCode');
+		}
+	}
+	if (ok) {
+		const user = await findOrCreateUser(email);
+		await startSession(Astro.cookies, user.id, {
+			secure: Astro.url.protocol === 'https:',
+			userAgent: Astro.request.headers.get('user-agent'),
+		});
+		return Astro.redirect(safeNext(form.get('next'), Astro.url.origin), 303);
+	}
+} else if (form) {
+	email = normalizeEmail(String(form.get('email') ?? ''));
 	const ip = clientIp(Astro.request);
 	if (!EMAIL_RE.test(email)) {
 		error = t('signin.errEmail');
@@ -40,12 +65,12 @@ if (Astro.request.method === 'POST') {
 		if (!verdict.ok) {
 			error = t('signin.errVerify');
 		} else {
-			const token = await issueLoginToken({ email });
+			const { token, code } = await issueSignIn(email);
 			const link = new URL('/auth/verify', Astro.url.origin);
 			link.searchParams.set('token', token);
 			if (next !== '/') link.searchParams.set('next', next);
 			try {
-				await sendLoginLink(email, link.toString(), lang);
+				await sendLoginLink(email, link.toString(), code, lang);
 				sent = true;
 			} catch (err) {
 				console.error('sign-in email failed', err);
@@ -61,12 +86,27 @@ if (Astro.request.method === 'POST') {
 		<header class="page-head">
 			<span class="eyebrow">{t('signin.eyebrow')}</span>
 			<h1>{sent ? t('signin.checkInbox') : t('signin.title')}</h1>
-			<p class="sub">{sent ? t('signin.sent') : t('signin.lead')}</p>
+			<p class="sub">{sent ? t('signin.sentCode') : t('signin.lead')}</p>
 		</header>
 		{error && <div class="alert err">{error}</div>}
+		{sent && (
+			<>
+				<form method="post">
+					<input type="hidden" name="action" value="code" />
+					<input type="hidden" name="email" value={email} />
+					<input type="hidden" name="next" value={next} />
+					<div class="field">
+						<label for="code">{t('signin.code')}</label>
+						<input id="code" name="code" type="text" required inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7" autocomplete="one-time-code" autofocus style="font-size:1.5rem;letter-spacing:0.3em;text-align:center" />
+					</div>
+					<button type="submit" style="width:100%;margin-top:0.5rem">{t('signin.codeSubmit')}</button>
+				</form>
+				<p style="text-align:center;margin:1rem 0 0"><a href={`/signin${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`}>{t('signin.otherEmail')}</a></p>
+			</>
+		)}
 		{!sent && (
 			<>
-				{googleEnabled() && (
+				{googleEnabled() && !Astro.locals.inApp && (
 					<>
 						<a class="google-btn" href={`/auth/google?next=${encodeURIComponent(next)}`}>
 							<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.8-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.9l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
@@ -76,6 +116,7 @@ if (Astro.request.method === 'POST') {
 					</>
 				)}
 				<form method="post">
+					<input type="hidden" name="next" value={next} />
 					<div class="field">
 						<label for="email">{t('signin.email')}</label>
 						<input id="email" name="email" type="email" required autocomplete="email" placeholder={t('signin.placeholder')} />

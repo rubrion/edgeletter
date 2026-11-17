@@ -160,7 +160,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         campaign: null,
         dispatch: null,
         alreadySent: false,
-        error: `Monthly email limit reached (${emailsPerMonth.toLocaleString()} emails${probation ? ' during the first week' : ''}). The post is published; upgrade to Pro or wait for next month to send it.`,
+        error: `Monthly email limit reached (${emailsPerMonth.toLocaleString()} emails${probation ? ' during the first week' : ''}). The post is published; ${locals.inApp ? '' : 'upgrade to Pro or '}wait for next month to send it.`,
       },
       { status: 402 },
     );

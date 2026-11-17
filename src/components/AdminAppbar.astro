@@ -20,7 +20,7 @@ interface Props {
 }
 
 const { current } = Astro.props;
-const { user, role, publication } = Astro.locals;
+const { user, role, publication, inApp } = Astro.locals;
 
 const settings = publication ? await loadSettings(publication.id) : null;
 const themeColor = settings?.themePrimaryColor ?? '#B44A27';
@@ -81,7 +81,8 @@ if (publication) {
       items: [
         { key: 'members', href: '/members', label: t('nav.team') },
         { key: 'keys', href: '/keys', label: t('nav.keys') },
-        { key: 'billing', href: '/billing', label: t('nav.plan') },
+        // Store app: no plans or checkout (src/lib/native.ts).
+        ...(inApp ? [] : [{ key: 'billing' as const, href: '/billing', label: t('nav.plan') }]),
       ],
     });
   }
@@ -143,6 +144,7 @@ if (user?.isStaff) groups.push({ title: t('nav.platform'), items: [{ key: 'staff
     {mine.length > 0 && <a href="/onboarding" class="item subtle">{t('nav.newPublication')}</a>}
     <LangSwitch class="item" />
     {user && <span class="who" title={user.email}>{user.email}</span>}
+    {user && <a href="/account" class="item subtle">{t('nav.account')}</a>}
     <form method="post" action="/signout" class="signout-form">
       <button type="submit" class="item signout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS.out} /></svg>{t('nav.signOut')}</button>
     </form>
@@ -273,7 +275,8 @@ if (user?.isStaff) groups.push({ title: t('nav.platform'), items: [{ key: 'staff
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
-      padding: 0.6rem 1rem;
+      /* safe-area insets: the store app draws edge to edge (viewport-fit=cover). */
+      padding: calc(0.6rem + env(safe-area-inset-top, 0px)) 1rem 0.6rem;
       background: var(--card);
       border-bottom: var(--hairline);
       box-shadow: var(--shadow-paper);
@@ -282,7 +285,7 @@ if (user?.isStaff) groups.push({ title: t('nav.platform'), items: [{ key: 'staff
     .top-brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .menu-btn { display: grid; place-items: center; width: 40px; height: 40px; cursor: pointer; }
     .menu-btn svg { fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
-    .app-sidebar { transform: translateX(-105%); transition: transform 0.25s ease; width: min(84vw, 300px); }
+    .app-sidebar { transform: translateX(-105%); transition: transform 0.25s ease; width: min(84vw, 300px); padding-top: calc(1.25rem + env(safe-area-inset-top, 0px)); padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
     .nav-toggle:checked ~ .app-sidebar { transform: none; }
     .nav-toggle:checked ~ .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(42, 35, 29, 0.35); }
   }

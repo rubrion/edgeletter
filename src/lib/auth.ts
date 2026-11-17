@@ -1,5 +1,5 @@
 import type { AstroCookies } from 'astro';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   apiKeys,
   getDbInstance,
@@ -147,6 +147,84 @@ export const consumeLoginToken = async (token: string) => {
     .returning();
   return row ?? null;
 };
+
+// ---------- Sign-in codes ----------
+// The sign-in email carries a link and a 6-digit code. The link is for the
+// browser; the code is for the store app, where tapping the link would open
+// the system browser and leave the session there.
+
+export const CODE_MAX_ATTEMPTS = 5;
+
+const codeHash = (tokenId: string, code: string) => sha256(`${tokenId}:${code}`);
+
+export const randomCode = (): string =>
+  String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0');
+
+/** Sign-in token plus its code; both are single-use and expire together. */
+export const issueSignIn = async (email: string): Promise<{ token: string; code: string }> => {
+  const token = await issueLoginToken({ email });
+  const code = randomCode();
+  const id = await sha256(token);
+  await getDbInstance().update(loginTokens).set({ codeHash: await codeHash(id, code) }).where(eq(loginTokens.id, id));
+  return { token, code };
+};
+
+/**
+ * Checks a typed code against the newest live sign-in for the email. A wrong
+ * code counts an attempt; at CODE_MAX_ATTEMPTS the token is burnt (callers
+ * also rate-limit per email). A match is consumed in the same statement.
+ */
+export const consumeLoginCode = async (email: string, code: string) => {
+  if (!/^\d{6}$/.test(code)) return null;
+  const db = getDbInstance();
+  const now = new Date();
+  const [row] = await db
+    .select()
+    .from(loginTokens)
+    .where(
+      and(
+        eq(loginTokens.email, normalizeEmail(email)),
+        eq(loginTokens.purpose, 'login'),
+        isNotNull(loginTokens.codeHash),
+        isNull(loginTokens.usedAt),
+        gt(loginTokens.expiresAt, now),
+      ),
+    )
+    .orderBy(desc(loginTokens.createdAt))
+    .limit(1);
+  if (!row || row.attempts >= CODE_MAX_ATTEMPTS) return null;
+  if ((await codeHash(row.id, code)) !== row.codeHash) {
+    await db
+      .update(loginTokens)
+      .set({
+        attempts: sql`${loginTokens.attempts} + 1`,
+        usedAt: row.attempts + 1 >= CODE_MAX_ATTEMPTS ? now : null,
+      })
+      .where(eq(loginTokens.id, row.id));
+    return null;
+  }
+  const [used] = await db
+    .update(loginTokens)
+    .set({ usedAt: now })
+    .where(and(eq(loginTokens.id, row.id), isNull(loginTokens.usedAt)))
+    .returning();
+  return used ?? null;
+};
+
+/**
+ * Store review: Play reviewers can't receive our email, so one account named
+ * by the REVIEW_EMAIL secret also accepts the fixed REVIEW_CODE secret.
+ */
+export const isReviewLogin = (
+  env: { REVIEW_EMAIL?: string; REVIEW_CODE?: string },
+  email: string,
+  code: string,
+): boolean =>
+  !!env.REVIEW_EMAIL &&
+  !!env.REVIEW_CODE &&
+  env.REVIEW_CODE.length >= 6 &&
+  normalizeEmail(env.REVIEW_EMAIL) === normalizeEmail(email) &&
+  env.REVIEW_CODE === code;
 
 // ---------- Memberships ----------
 

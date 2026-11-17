@@ -10,7 +10,7 @@ const { title } = Astro.props;
 ---
 
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content={Astro.locals.inApp ? 'width=device-width,initial-scale=1,viewport-fit=cover' : 'width=device-width,initial-scale=1'} />
 <meta name="robots" content="noindex" />
 <title>{title}</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

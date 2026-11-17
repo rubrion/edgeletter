@@ -1,0 +1,61 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import { deleteAccount, soleOwnedPublications } from '../../lib/account';
+import { endSession, normalizeEmail } from '../../lib/auth';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
+const { user } = Astro.locals as Required<App.Locals>;
+const t = studio(getLang(Astro.request));
+let error: string | null = null;
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	if (form.get('action') === 'delete') {
+		if (normalizeEmail(String(form.get('confirm') ?? '')) !== user.email) {
+			error = t('acct.errConfirm');
+		} else {
+			try {
+				await deleteAccount(user.id);
+				await endSession(Astro.cookies, Astro.url.protocol === 'https:');
+				return Astro.redirect('/delete-account?done=1', 303);
+			} catch (err) {
+				console.error('account deletion failed', err);
+				error = t('acct.errFailed');
+			}
+		}
+	}
+}
+
+const doomed = await soleOwnedPublications(user.id);
+---
+
+<AppLayout title={t('acct.title')}>
+	<div class="card app-card">
+		<header class="page-head">
+			<span class="eyebrow">{t('nav.account')}</span>
+			<h1>{t('acct.title')}</h1>
+			<p class="sub">{t('acct.lead', { email: user.email })}</p>
+		</header>
+		{error && <div class="alert err">{error}</div>}
+
+		<h2>{t('acct.deleteHeading')}</h2>
+		<p>{t('acct.deleteLead')}</p>
+		{doomed.length ? (
+			<>
+				<p>{t('acct.deletePubs')}</p>
+				<ul>{doomed.map((p) => <li><strong>{p.name}</strong> <span class="muted">({p.handle})</span></li>)}</ul>
+			</>
+		) : (
+			<p class="muted">{t('acct.deleteNoPubs')}</p>
+		)}
+		<form method="post" class="stack">
+			<input type="hidden" name="action" value="delete" />
+			<div class="field">
+				<label for="confirm">{t('acct.confirm')}</label>
+				<input id="confirm" name="confirm" type="email" required autocomplete="off" placeholder={user.email} />
+			</div>
+			<button type="submit" style="background:#9C2F14;border-color:#9C2F14">{t('acct.deleteSubmit')}</button>
+		</form>
+	</div>
+</AppLayout>

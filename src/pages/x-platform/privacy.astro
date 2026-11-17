@@ -1,0 +1,74 @@
+---
+/**
+ * Privacy policy (edgeletter.blog/privacy): linked from the platform footer
+ * and given to Google Play. Keep it in step with what the code actually does.
+ */
+import PlatformLayout from '../../layouts/PlatformLayout.astro';
+import { getLang } from '../../i18n';
+
+const pt = getLang(Astro.request) === 'pt-BR';
+const updated = '2026-11-16';
+---
+
+<PlatformLayout
+	title={pt ? 'Privacidade — EdgeLetter' : 'Privacy — EdgeLetter'}
+	description={pt ? 'Como o EdgeLetter trata seus dados.' : 'How EdgeLetter handles your data.'}
+>
+	<main class="legal">
+		{pt ? (
+			<article>
+				<h1>Política de privacidade</h1>
+				<p class="micro">Atualizada em {updated}</p>
+				<p>O EdgeLetter (edgeletter.blog, app.edgeletter.blog e o app Android) é operado pela Rubrion. Esta política explica quais dados tratamos, por quê e o que você pode fazer.</p>
+				<h2>Dados de quem escreve (contas)</h2>
+				<ul>
+					<li><strong>E-mail</strong>, para entrar (link ou código por e-mail) e para avisos da conta.</li>
+					<li><strong>Nome e foto</strong>, apenas se você entrar com o Google.</li>
+					<li><strong>Conteúdo</strong> que você cria: publicações, posts, imagens, configurações.</li>
+					<li><strong>Dados técnicos</strong>: endereço IP e navegador, usados para segurança, limites de uso e na sessão.</li>
+					<li><strong>Pagamento</strong>: no plano Pro (somente no site), o pagamento é feito no Stripe; não guardamos dados de cartão.</li>
+				</ul>
+				<h2>Dados de inscritos</h2>
+				<p>Quem escreve decide quem recebe sua newsletter. Guardamos o e-mail dos inscritos, idioma, data de confirmação e eventos de entrega, abertura e clique, para enviar as edições e mostrar estatísticas a quem escreve. Todo e-mail tem link para cancelar a inscrição.</p>
+				<h2>Com quem compartilhamos</h2>
+				<p>Não vendemos dados nem usamos anúncios ou rastreadores de terceiros. Usamos fornecedores que tratam dados em nosso nome: Cloudflare (hospedagem, banco de dados, armazenamento, verificação anti-robô e a revisão por IA dos rascunhos), Resend (envio de e-mails), Stripe (pagamentos) e Google (login opcional).</p>
+				<h2>Cookies</h2>
+				<p>Só cookies necessários: sessão, publicação ativa e idioma. Nenhum cookie de análise ou publicidade.</p>
+				<h2>Retenção e exclusão</h2>
+				<p>Guardamos os dados enquanto a conta existir. Você pode excluir sua conta a qualquer momento em Conta → Excluir minha conta, no app ou no site (veja <a href="https://app.edgeletter.blog/delete-account">app.edgeletter.blog/delete-account</a>). Isso apaga a conta e as publicações das quais você é o único dono, com posts, inscritos e mídias. Registros exigidos por lei, como faturas, podem ser mantidos.</p>
+				<h2>Seus direitos</h2>
+				<p>Você pode pedir acesso, correção, portabilidade ou exclusão dos seus dados (LGPD e GDPR) escrevendo para <a href="mailto:hello@rubrion.ai">hello@rubrion.ai</a>.</p>
+			</article>
+		) : (
+			<article>
+				<h1>Privacy policy</h1>
+				<p class="micro">Updated {updated}</p>
+				<p>EdgeLetter (edgeletter.blog, app.edgeletter.blog and the Android app) is run by Rubrion. This policy explains what data we handle, why, and what you can do about it.</p>
+				<h2>Writers (accounts)</h2>
+				<ul>
+					<li><strong>Email address</strong>, to sign in (emailed link or code) and for account notices.</li>
+					<li><strong>Name and picture</strong>, only if you sign in with Google.</li>
+					<li><strong>Content</strong> you create: publications, posts, images, settings.</li>
+					<li><strong>Technical data</strong>: IP address and browser, used for security, rate limits and your session.</li>
+					<li><strong>Payments</strong>: on the Pro plan (website only), payment happens at Stripe; we never store card details.</li>
+				</ul>
+				<h2>Subscribers</h2>
+				<p>Writers decide who receives their newsletter. We store subscribers' email address, language, confirmation date and delivery, open and click events, to send issues and show writers their stats. Every email has an unsubscribe link.</p>
+				<h2>Who we share data with</h2>
+				<p>We don't sell data and use no ads or third-party trackers. We use providers that process data on our behalf: Cloudflare (hosting, database, storage, bot checks and the AI review of drafts), Resend (email delivery), Stripe (payments) and Google (optional sign-in).</p>
+				<h2>Cookies</h2>
+				<p>Only necessary cookies: your session, active publication and language. No analytics or advertising cookies.</p>
+				<h2>Retention and deletion</h2>
+				<p>We keep data while your account exists. You can delete your account at any time under Account → Delete my account, in the app or on the website (see <a href="https://app.edgeletter.blog/delete-account">app.edgeletter.blog/delete-account</a>). This deletes the account and the publications you own alone, with their posts, subscribers and media. Records we must keep by law, such as invoices, may be retained.</p>
+				<h2>Your rights</h2>
+				<p>You can ask to access, correct, export or delete your data (GDPR and LGPD) by writing to <a href="mailto:hello@rubrion.ai">hello@rubrion.ai</a>.</p>
+			</article>
+		)}
+	</main>
+	<style>
+		.legal { max-width: 680px; margin: 0 auto; padding: 0 1rem; }
+		.legal h1 { margin-bottom: 0.3rem; }
+		.legal h2 { margin-top: 2.2rem; font-size: 1.5rem; }
+		.legal p, .legal li { line-height: 1.7; }
+	</style>
+</PlatformLayout>

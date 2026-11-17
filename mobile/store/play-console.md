@@ -46,7 +46,7 @@ Escreva seus posts, publique no seu próprio site e envie por e-mail para seus i
 Entre com o código de 6 dígitos que enviamos por e-mail. Sem senha.
 ```
 
-**Graphics:** `icon-512.png`, `feature-1024x500.png` (this folder). Phone screenshots: `en-1-overview.png` … `en-6-signin.png` (1080×1920, from the app on Android 16).
+**Graphics:** `icon-512.png`, `feature-1024x500.png` (this folder). Phone screenshots: `en-1-overview.png` … `en-6-signin.png` for en-US and `pt-1-overview.png` … `pt-6-signin.png` for pt-BR (1080×1920, from the app on Android 16).
 
 **Contact email:** hello@rubrion.ai · **Website:** https://edgeletter.blog
 

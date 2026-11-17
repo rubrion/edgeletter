@@ -1,0 +1,11 @@
+node_modules
+/android/app/build
+/android/build
+/android/.gradle
+/android/local.properties
+/ios/App/build
+*.keystore
+*.jks
+/android/key.properties
+/fastlane/
+release_notes.json

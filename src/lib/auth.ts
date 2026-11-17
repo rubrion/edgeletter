@@ -222,7 +222,7 @@ export const isReviewLogin = (
 ): boolean =>
   !!env.REVIEW_EMAIL &&
   !!env.REVIEW_CODE &&
-  env.REVIEW_CODE.length >= 6 &&
+  env.REVIEW_CODE.length >= 10 &&
   normalizeEmail(env.REVIEW_EMAIL) === normalizeEmail(email) &&
   env.REVIEW_CODE === code;
 

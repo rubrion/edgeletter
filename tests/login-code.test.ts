@@ -41,9 +41,9 @@ test('codes are bound to their email and must be well-formed', async () => {
 });
 
 test('review login needs both secrets and an exact match', () => {
-  const env = { REVIEW_EMAIL: 'Review@EdgeLetter.blog', REVIEW_CODE: '424242' };
-  expect(isReviewLogin(env, 'review@edgeletter.blog', '424242')).toBe(true);
-  expect(isReviewLogin(env, 'review@edgeletter.blog', '424243')).toBe(false);
-  expect(isReviewLogin(env, 'other@edgeletter.blog', '424242')).toBe(false);
+  const env = { REVIEW_EMAIL: 'Review@EdgeLetter.blog', REVIEW_CODE: '4242424242' };
+  expect(isReviewLogin(env, 'review@edgeletter.blog', '4242424242')).toBe(true);
+  expect(isReviewLogin(env, 'review@edgeletter.blog', '4242424243')).toBe(false);
+  expect(isReviewLogin(env, 'other@edgeletter.blog', '4242424242')).toBe(false);
   expect(isReviewLogin({ REVIEW_EMAIL: 'review@edgeletter.blog' }, 'review@edgeletter.blog', '')).toBe(false);
 });

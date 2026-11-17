@@ -81,7 +81,7 @@ const loc = lang === 'pt-BR' ? 'pt-BR' : 'en-US';
 			<span class="l">{t('ov.published')}</span>
 			<span class="cap">{t('ov.drafts', { n: Number(postCounts?.total ?? 0) - Number(postCounts?.published ?? 0) })}</span>
 		</a>
-		<a class="tile card" href="/billing">
+		<a class="tile card" href={Astro.locals.inApp ? '/admin/stats' : '/billing'}>
 			<span class="n">{sent.toLocaleString()}</span>
 			<span class="l">{t('ov.emails')}</span>
 			<span class="meter"><span style={`width:${pct(sent, limits.emailsPerMonth)}`}></span></span>

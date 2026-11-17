@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title>EdgeLetter</title>
+		<style>
+			:root { color-scheme: light dark; }
+			body {
+				display: grid;
+				min-height: 100dvh;
+				margin: 0;
+				place-items: center;
+				padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
+				background: #E7E4DE;
+				color: #2A231D;
+				font: 17px/1.55 Georgia, 'Times New Roman', serif;
+				text-align: center;
+			}
+			main { max-width: 340px; padding: 36px 28px 30px; background: #F5F3EE; border: 1px solid #D6D0C6; }
+			h1 { margin: 0 0 10px; font-weight: 500; font-size: 30px; line-height: 1.15; }
+			p { margin: 0 0 24px; color: #7A6E62; font-style: italic; }
+			a { display: inline-block; padding: 13px 24px; background: #2A231D; color: #F5F3EE; font: 600 13px/1 system-ui, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; }
+			@media (prefers-color-scheme: dark) {
+				body { background: #2A231D; color: #F5F3EE; }
+				main { background: #352D26; border-color: #4A3F35; }
+				p { color: #B9AC9C; }
+				a { background: #B44A27; }
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>You’re offline</h1>
+			<p>EdgeLetter needs a connection. Check it and try again.</p>
+			<a href="https://app.edgeletter.blog">Try again</a>
+		</main>
+	</body>
+</html>

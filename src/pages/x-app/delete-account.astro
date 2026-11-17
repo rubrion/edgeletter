@@ -1,0 +1,30 @@
+---
+/**
+ * Public "how to delete your account" page: the URL given to Google Play's
+ * data-deletion form. Works signed in or out.
+ */
+import AppLayout from '../../layouts/AppLayout.astro';
+import { getLang } from '../../i18n';
+import { studio } from '../../i18n/studio';
+
+const t = studio(getLang(Astro.request));
+const done = Astro.url.searchParams.get('done') === '1' && !Astro.locals.user;
+---
+
+<AppLayout title={t('del.title')} bare width="narrow">
+	<div class="card app-card">
+		<header class="page-head">
+			<span class="eyebrow">EdgeLetter</span>
+			<h1>{t('del.title')}</h1>
+			<p class="sub">{t('del.lead')}</p>
+		</header>
+		{done && <div class="alert ok">{t('del.done')}</div>}
+		<p>{t('del.steps')}</p>
+		<p>{t('del.what')}</p>
+		{!done && (
+			<a class="button" href={Astro.locals.user ? '/account' : '/signin?next=%2Faccount'}>
+				{Astro.locals.user ? t('del.goAccount') : t('del.signin')}
+			</a>
+		)}
+	</div>
+</AppLayout>

@@ -1,0 +1,2 @@
+• First release of EdgeLetter for Android: write, publish and send your newsletter from your phone.
+• Sign in with the 6-digit code from your email.

@@ -105,3 +105,12 @@ export const createPortal = (customerId: string, returnUrl: string) =>
 export { verifyStripeSignature } from './stripe-verify';
 
 export const webhookSecret = (): string | undefined => cfg().STRIPE_WEBHOOK_SECRET;
+
+/** Cancels a subscription now (account deletion). Already gone counts as done. */
+export const cancelSubscription = async (id: string): Promise<void> => {
+  const res = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${cfg().STRIPE_SECRET_KEY}` },
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`stripe cancel subscription: ${res.status}`);
+};

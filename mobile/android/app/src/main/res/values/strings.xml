@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">EdgeLetter</string>
+    <string name="title_activity_main">EdgeLetter</string>
+    <string name="package_name">blog.edgeletter</string>
+    <string name="custom_url_scheme">blog.edgeletter</string>
+</resources>

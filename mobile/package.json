@@ -1,0 +1,22 @@
+{
+  "name": "edgeletter-app",
+  "version": "1.0.0",
+  "description": "EdgeLetter for Android: a Capacitor shell around app.edgeletter.blog, so the app updates with every web deploy.",
+  "private": true,
+  "scripts": {
+    "sync": "cap sync",
+    "android": "cap open android",
+    "assets": "capacitor-assets generate --android --iconBackgroundColor '#B44A27' --iconBackgroundColorDark '#B44A27' --splashBackgroundColor '#E7E4DE' --splashBackgroundColorDark '#2A231D'",
+    "apk:debug": "cd android && ./gradlew assembleDebug",
+    "aab:release": "cd android && ./gradlew bundleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
+    "typescript": "^5.9.3"
+  }
+}

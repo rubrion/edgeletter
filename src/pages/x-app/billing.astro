@@ -3,6 +3,8 @@ import AppLayout from '../../layouts/AppLayout.astro';
 import { emailsThisMonth, formatBytes, limitsFor, mediaBytesUsed, PLAN_LIMITS, PRO_PRICE, subscriberCount } from '../../lib/plans';
 import { embeddedEnabled, publishableKey, retrieveCheckout, stripeEnabled, yearlyEnabled } from '../../lib/stripe';
 import { applySubscription } from '../../lib/billing';
+import { eq } from 'drizzle-orm';
+import { getDbInstance, publications } from '../../db';
 import { getLang } from '../../i18n';
 import { studio } from '../../i18n/studio';
 
@@ -38,6 +40,16 @@ const upgraded = Astro.url.searchParams.get('upgraded') === '1';
 const incomplete = Astro.url.searchParams.get('checkout') === 'incomplete';
 const embedded = embeddedEnabled();
 const pro = publication.plan === 'pro';
+// Pro without a Stripe subscription was granted by staff (house and reviewer
+// accounts): nothing to bill, so no portal. A past customer still gets the
+// portal for invoices.
+const [billingRow] = await getDbInstance()
+	.select({ customerId: publications.stripeCustomerId, subscriptionId: publications.stripeSubscriptionId })
+	.from(publications)
+	.where(eq(publications.id, publication.id))
+	.limit(1);
+const complimentary = pro && !billingRow?.subscriptionId;
+const canManage = stripeEnabled() && !!billingRow?.customerId;
 ---
 
 <AppLayout title={t('nav.plan')} current="billing">
@@ -45,7 +57,7 @@ const pro = publication.plan === 'pro';
 		<header class="page-head">
 			<span class="eyebrow">{t('bill.eyebrow')}</span>
 			<h1>{pro ? t('bill.pro') : t('bill.free')}</h1>
-			<p class="sub">{limits.probation ? t('bill.probation') : pro ? t('bill.thanks') : t('bill.upgradeLead')}</p>
+			<p class="sub">{limits.probation ? t('bill.probation') : complimentary ? t('bill.compLead') : pro ? t('bill.thanks') : t('bill.upgradeLead')}</p>
 		</header>
 		{upgraded && (pro ? <div class="alert ok">{t('bill.welcomePro')}</div> : <div class="alert ok">{t('bill.paid')}</div>)}
 		{incomplete && <div class="alert err">{t('bill.incomplete')}</div>}
@@ -60,7 +72,10 @@ const pro = publication.plan === 'pro';
 
 		<h2>{pro ? t('bill.manage') : t('bill.includes')}</h2>
 		{pro ? (
-			<form method="post" action="/api/billing/portal"><button type="submit">{t('bill.manageBilling')}</button></form>
+			<>
+				{complimentary && <p class="muted comp-note">{t('bill.compNote')}</p>}
+				{canManage && <form method="post" action="/api/billing/portal"><button type="submit">{complimentary ? t('bill.invoices') : t('bill.manageBilling')}</button></form>}
+			</>
 		) : (
 			<>
 				<dl class="kv">
@@ -83,28 +98,26 @@ const pro = publication.plan === 'pro';
 						</form>
 					)}
 				</div>
-				{embedded && (
-					<section class="checkout-panel" id="checkout-panel" hidden>
-						<div class="checkout-head">
-							<span class="eyebrow" style="text-align:left">{t('bill.secure')}</span>
-							<button type="button" class="link-btn" id="checkout-close">{t('bill.cancel')}</button>
-						</div>
-						<p class="checkout-status muted" id="checkout-status">{t('bill.loading')}</p>
-						<div id="checkout"></div>
-					</section>
-				)}
 			</>
 		)}
 	</div>
 
 	{embedded && !pro && (
 		<>
+			<dialog class="checkout-modal" id="checkout-modal" aria-labelledby="checkout-title">
+				<div class="checkout-head">
+					<span class="eyebrow" id="checkout-title">{t('bill.secure')}</span>
+					<button type="button" class="close-btn" id="checkout-close" aria-label={t('bill.cancel')}>×</button>
+				</div>
+				<p class="checkout-status muted" id="checkout-status">{t('bill.loading')}</p>
+				<div id="checkout"></div>
+			</dialog>
 			<script is:inline src="https://js.stripe.com/v3/" async></script>
 			<script
 				is:inline
 				define:vars={{ pk: publishableKey(), errMsg: t('bill.checkoutError'), loading: t('bill.loading'), locale: lang === 'pt-BR' ? 'pt-BR' : 'en' }}
 			>
-				const panel = document.getElementById('checkout-panel');
+				const modal = document.getElementById('checkout-modal');
 				const status = document.getElementById('checkout-status');
 				const forms = document.querySelectorAll('form[data-checkout]');
 				let instance = null;
@@ -116,22 +129,24 @@ const pro = publication.plan === 'pro';
 						tick();
 					});
 
-				const close = () => {
+				// Every way out (×, Esc, backdrop click) ends in the dialog's close event.
+				modal.addEventListener('close', () => {
 					if (instance) { instance.destroy(); instance = null; }
-					panel.hidden = true;
+					document.documentElement.classList.remove('modal-open');
 					forms.forEach((f) => (f.querySelector('button').disabled = false));
-				};
-				document.getElementById('checkout-close').addEventListener('click', close);
+				});
+				document.getElementById('checkout-close').addEventListener('click', () => modal.close());
+				modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
 
 				forms.forEach((form) =>
 					form.addEventListener('submit', async (e) => {
 						e.preventDefault();
-						if (instance) close();
+						if (modal.open) modal.close();
 						forms.forEach((f) => (f.querySelector('button').disabled = true));
-						panel.hidden = false;
 						status.hidden = false;
 						status.textContent = loading;
-						panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+						document.documentElement.classList.add('modal-open');
+						modal.showModal();
 						try {
 							const Stripe = await waitForStripe();
 							const stripe = Stripe(pk, { locale });
@@ -153,7 +168,6 @@ const pro = publication.plan === 'pro';
 						} catch (err) {
 							console.error(err);
 							status.textContent = errMsg;
-							forms.forEach((f) => (f.querySelector('button').disabled = false));
 						}
 					}),
 				);
@@ -162,11 +176,29 @@ const pro = publication.plan === 'pro';
 	)}
 
 	<style>
-		.checkout-panel { margin-top: 1.75rem; padding-top: 1.25rem; border-top: var(--hairline); scroll-margin-top: 1.5rem; }
-		.checkout-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem; }
-		.link-btn { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 0.9rem; text-decoration: underline; cursor: pointer; box-shadow: none; }
-		.link-btn:hover { color: var(--accent); background: none; }
-		.checkout-status { font-style: italic; }
+		.comp-note { font-style: italic; margin: 0 0 1rem; }
+		:global(html.modal-open) { overflow: hidden; }
+		.checkout-modal {
+			width: min(560px, calc(100vw - 2rem));
+			max-height: calc(100dvh - 2rem);
+			padding: 1.25rem 1.25rem 1.5rem;
+			border: var(--hairline);
+			border-radius: 4px;
+			background: var(--card);
+			color: var(--text);
+			box-shadow: var(--shadow-lift);
+			overflow-y: auto;
+		}
+		.checkout-modal[open] { animation: modal-in 0.28s var(--ease-paper, ease) both; }
+		.checkout-modal::backdrop { background: rgba(28, 22, 18, 0.45); backdrop-filter: blur(2px); animation: fade-in 0.2s ease both; }
+		@keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(0.985); } to { opacity: 1; transform: none; } }
+		@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+		@media (prefers-reduced-motion: reduce) { .checkout-modal[open], .checkout-modal::backdrop { animation: none; } }
+		.checkout-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+		.checkout-head .eyebrow { text-align: left; margin: 0; }
+		.close-btn { width: 2.25rem; height: 2.25rem; padding: 0; background: none; border: 0; box-shadow: none; color: var(--muted); font-size: 1.6rem; line-height: 1; cursor: pointer; letter-spacing: 0; }
+		.close-btn:hover { color: var(--accent); background: none; }
+		.checkout-status { font-style: italic; text-align: center; padding: 2rem 0; }
 		#checkout { min-height: 2rem; border-radius: 6px; overflow: hidden; }
 	</style>
 </AppLayout>

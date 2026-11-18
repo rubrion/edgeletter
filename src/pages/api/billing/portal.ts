@@ -10,6 +10,11 @@ export const POST: APIRoute = async ({ locals, url, redirect }) => {
     .where(eq(publications.id, locals.publication.id))
     .limit(1);
   if (!stripeEnabled() || !pub?.customerId) return redirect('/billing', 303);
-  const session = await createPortal(pub.customerId, `${url.origin}/billing`);
-  return redirect(session.url, 303);
+  try {
+    const session = await createPortal(pub.customerId, `${url.origin}/billing`);
+    return redirect(session.url, 303);
+  } catch (err) {
+    console.error('portal', err);
+    return redirect('/billing?error=portal', 303);
+  }
 };

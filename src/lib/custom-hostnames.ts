@@ -1,4 +1,10 @@
 import { env } from 'cloudflare:workers';
+import {
+  createCustomHostnamesClient,
+  PENDING_TTL_MS,
+  validCustomHost as validHostFor,
+  type HostnameState,
+} from '@rubrion/core/custom-hostnames';
 import { and, eq, isNotNull, lt, ne, or, sql } from 'drizzle-orm';
 import { getDbInstance, publications } from '../db';
 import { invalidatePublicationCache, platformDomain } from './tenant';
@@ -16,58 +22,20 @@ const cfg = () => env as unknown as CfEnv;
 export const customDomainsEnabled = (): boolean => !!cfg().CF_API_TOKEN && !!cfg().CF_ZONE_ID;
 export const cnameTarget = (): string => cfg().CUSTOM_DOMAIN_TARGET || `customers.${platformDomain()}`;
 
-export type HostnameState = {
-  id: string;
-  status: string;
-  sslStatus: string;
-  active: boolean;
-  errors: string[];
-};
+export type { HostnameState };
 
-const api = async (path: string, init: RequestInit = {}) => {
-  const res = await fetch(`https://api.cloudflare.com/client/v4/zones/${cfg().CF_ZONE_ID}/custom_hostnames${path}`, {
-    ...init,
-    headers: { Authorization: `Bearer ${cfg().CF_API_TOKEN}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
-  });
-  const json = (await res.json()) as {
-    success: boolean;
-    errors?: { message: string }[];
-    result?: {
-      id: string;
-      status: string;
-      ssl?: { status?: string; validation_errors?: { message: string }[] };
-      verification_errors?: string[];
-    };
-  };
-  if (!json.success) throw new Error(json.errors?.map((e) => e.message).join('; ') || `cloudflare ${res.status}`);
-  return json.result;
-};
+// Cloudflare API client from @rubrion/core, built per call so env is read lazily.
+const client = () => createCustomHostnamesClient({ apiToken: cfg().CF_API_TOKEN, zoneId: cfg().CF_ZONE_ID });
 
-const toState = (r: NonNullable<Awaited<ReturnType<typeof api>>>): HostnameState => ({
-  id: r.id,
-  status: r.status,
-  sslStatus: r.ssl?.status ?? 'unknown',
-  active: r.status === 'active' && r.ssl?.status === 'active',
-  errors: [...(r.verification_errors ?? []), ...(r.ssl?.validation_errors?.map((e) => e.message) ?? [])],
-});
+export const createHostname = (hostname: string): Promise<HostnameState> => client().create(hostname);
 
-export const createHostname = async (hostname: string): Promise<HostnameState> =>
-  toState((await api('', { method: 'POST', body: JSON.stringify({ hostname, ssl: { method: 'http', type: 'dv' } }) }))!);
+export const getHostname = (id: string): Promise<HostnameState> => client().get(id);
 
-export const getHostname = async (id: string): Promise<HostnameState> => toState((await api(`/${id}`))!);
-
-export const deleteHostname = async (id: string): Promise<void> => {
-  await api(`/${id}`, { method: 'DELETE' });
-};
+export const deleteHostname = (id: string): Promise<void> => client().remove(id);
 
 /** A registrable hostname a writer may attach (not ours, no wildcards, no IPs). */
-export const validCustomHost = (raw: string): string | null => {
-  const host = raw.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-  if (!/^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host)) return null;
-  const root = platformDomain();
-  if (root && (host === root || host.endsWith(`.${root}`))) return null;
-  return host;
-};
+export const validCustomHost = (raw: string): string | null =>
+  validHostFor(raw, [platformDomain()].filter(Boolean));
 
 /**
  * Cost guard. Cloudflare allocates a large quota but bills each custom
@@ -98,7 +66,7 @@ export const releaseHostname = async (publicationId: string, cfHostnameId: strin
 };
 
 /** Setups never finished within this window are released. */
-export const PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export { PENDING_TTL_MS };
 
 /**
  * Daily sweep (cron): release hostnames that are (a) still pending after a

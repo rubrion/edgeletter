@@ -20,6 +20,7 @@
     "@astrojs/mdx": "^5.0.4",
     "@astrojs/react": "^5.0.4",
     "@astrojs/rss": "^4.0.18",
+    "@rubrion/core": "file:../rubrion-core",
     "astro": "^6.1.10",
     "drizzle-orm": "^0.36.4",
     "fast-xml-parser": "4.5.0",

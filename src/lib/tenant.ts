@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { createHostResolver, type HostResolver, TenantLookupError } from '@rubrion/core/host';
 import { eq } from 'drizzle-orm';
 import { getDbInstance, publicationAliases, publications, type Publication } from '../db';
 
@@ -27,7 +28,7 @@ export type HostTarget =
   | { kind: 'alias'; publication: PublicationContext }
   | { kind: 'unknown' };
 
-export class TenantLookupError extends Error {}
+export { TenantLookupError };
 
 export const platformDomain = (): string =>
   ((env as unknown as { PLATFORM_DOMAIN?: string }).PLATFORM_DOMAIN ?? '').trim().toLowerCase();
@@ -44,11 +45,6 @@ export const publicationColumns = {
   legacyMediaPrefix: publications.legacyMediaPrefix,
 };
 
-const TTL_MS = 60_000;
-const NEGATIVE_TTL_MS = 10_000;
-const MAX_ENTRIES = 1000;
-const cache = new Map<string, { value: HostTarget; at: number }>();
-
 const byField = async (field: 'customDomain' | 'handle' | 'id', value: string) => {
   const [row] = await getDbInstance()
     .select(publicationColumns)
@@ -61,52 +57,47 @@ const byField = async (field: 'customDomain' | 'handle' | 'id', value: string) =
 export const publicationById = (id: string) => byField('id', id);
 export const publicationByHandle = (handle: string) => byField('handle', handle);
 
-const lookup = async (host: string): Promise<HostTarget> => {
-  const root = platformDomain();
-  try {
-    if (root && (host === root || host === `www.${root}`)) return { kind: 'platform' };
-    if (root && host === `app.${root}`) return { kind: 'app' };
+// Host routing and its per-isolate cache come from @rubrion/core; EdgeLetter
+// supplies the lookups. Built lazily: PLATFORM_DOMAIN is read from env.
+let resolver: HostResolver<PublicationContext> | null = null;
+const getResolver = (): HostResolver<PublicationContext> =>
+  (resolver ??= createHostResolver<PublicationContext>({
+    roots: [platformDomain()].filter(Boolean),
+    lookups: {
+      // Custom domains are a Pro feature: after a downgrade the domain stops serving.
+      byCustomDomain: async (host) => {
+        const custom = await byField('customDomain', host);
+        return custom && custom.plan === 'pro' ? custom : null;
+      },
+      byAlias: async (host) => {
+        const [alias] = await getDbInstance()
+          .select({ publicationId: publicationAliases.publicationId })
+          .from(publicationAliases)
+          .where(eq(publicationAliases.host, host))
+          .limit(1);
+        return alias ? byField('id', alias.publicationId) : null;
+      },
+      bySubdomain: (handle) => byField('handle', handle),
+    },
+  }));
 
-    // Custom domains are a Pro feature: after a downgrade the domain stops serving.
-    const custom = await byField('customDomain', host);
-    if (custom && custom.plan === 'pro') return { kind: 'publication', publication: custom };
-
-    const [alias] = await getDbInstance()
-      .select({ publicationId: publicationAliases.publicationId })
-      .from(publicationAliases)
-      .where(eq(publicationAliases.host, host))
-      .limit(1);
-    if (alias) {
-      const pub = await byField('id', alias.publicationId);
-      if (pub) return { kind: 'alias', publication: pub };
-    }
-
-    if (root && host.endsWith(`.${root}`)) {
-      const handle = host.slice(0, -(root.length + 1));
-      if (handle && !handle.includes('.')) {
-        const pub = await byField('handle', handle);
-        if (pub) return { kind: 'publication', publication: pub };
-      }
-    }
-    return { kind: 'unknown' };
-  } catch (err) {
-    throw new TenantLookupError(String(err));
+export const resolveHost = async (hostHeader: string | null): Promise<HostTarget> => {
+  const target = await getResolver().resolve(hostHeader);
+  switch (target.kind) {
+    case 'tenant':
+      return { kind: 'publication', publication: target.tenant };
+    case 'alias':
+      return { kind: 'alias', publication: target.tenant };
+    case 'platform':
+    case 'app':
+      return { kind: target.kind };
+    default:
+      return { kind: 'unknown' };
   }
 };
 
-export const resolveHost = async (hostHeader: string | null): Promise<HostTarget> => {
-  const host = (hostHeader ?? '').toLowerCase().replace(/:\d+$/, '');
-  const hit = cache.get(host);
-  const ttl = hit && hit.value.kind !== 'unknown' ? TTL_MS : NEGATIVE_TTL_MS;
-  if (hit && Date.now() - hit.at < ttl) return hit.value;
-  const value = await lookup(host);
-  if (cache.size >= MAX_ENTRIES) cache.clear();
-  cache.set(host, { value, at: Date.now() });
-  return value;
-};
-
 /** Drop cached host mappings (after a handle, domain, plan or status change). */
-export const invalidatePublicationCache = (): void => cache.clear();
+export const invalidatePublicationCache = (): void => resolver?.invalidate();
 
 /** The publication of the current request; set by middleware. */
 export const pubId = (locals: App.Locals): string => locals.publication.id;

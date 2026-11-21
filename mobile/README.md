@@ -45,12 +45,12 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ### One-time setup
 
 Already done (2026-11-16):
+- **Stripe:** the Worker's restricted key has Subscriptions: Write, so account deletion cancels Pro subscriptions.
 - **GitHub:** the `rubrion` App is installed org-wide; `AUTOMATION_APP_PRIVATE_KEY` secret and `AUTO_RELEASE=true` set on `rubrion/edgeletter`; baseline tag `app-v1.0.0`.
-- **Worker:** `REVIEW_EMAIL` / `REVIEW_CODE` secrets set (also in Infisical, Edgeletter `prod:/worker`). The review account owns a demo publication, *Play Review* (`playreview`).
+- **Worker:** `REVIEW_EMAIL` / `REVIEW_CODE` secrets set (also in Infisical, Edgeletter `prod:/worker`). The review account owns a demo publication, *Field Notes* (`fieldnotes`, Pro plan, suppressed `@example.com` subscribers).
 - **Web:** privacy policy at https://edgeletter.blog/privacy, deletion page at https://app.edgeletter.blog/delete-account.
 
 Left to do:
 1. **Play Console:** create the app `blog.edgeletter` and fill the forms with `store/play-console.md`. Give the Play service account (the one Codemagic's `rubry` group uses, or a new one) access to the app.
 2. **Codemagic:** add `rubrion/edgeletter` as an app, create the env group `edgeletter` with `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` (that service account's JSON), and run *EdgeLetter · Android · Google Play (AAB)* on `main`. The `rubrion-release` keystore is team-level already.
 3. **First release:** Play needs the first bundle uploaded by hand. Download `app-release.aab` from that Codemagic run, upload it to Internal testing, then later runs publish by themselves.
-4. **Stripe (recommended):** give the Worker's restricted key *Subscriptions: Write* so account deletion cancels Pro subscriptions itself. Until then, staff get an email to cancel them by hand.

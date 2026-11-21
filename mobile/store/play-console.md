@@ -54,10 +54,12 @@ Entre com o código de 6 dígitos que enviamos por e-mail. Sem senha.
 
 - **Privacy policy:** https://edgeletter.blog/privacy
 - **Ads:** No ads.
-- **App access:** *All or some functionality is restricted* → add instructions:
+- **App access:** *All or some functionality is restricted* → Add instructions:
+  - Name: `Demo account`
   - Email: the `REVIEW_EMAIL` value (Infisical, Edgeletter `prod:/worker/REVIEW_EMAIL`)
-  - Code: the `REVIEW_CODE` value (`prod:/worker/REVIEW_CODE`)
-  - Instructions: "Enter the email, tap *Email me a sign-in link*, then type the code in the *Sign-in code* field. The account already has a demo publication."
+  - Password: the `REVIEW_CODE` value (`prod:/worker/REVIEW_CODE`), fixed and reusable
+  - Other info: "EdgeLetter has no passwords: users sign in with a one-time code sent by email. This demo account instead accepts a fixed, reusable code that never expires (the "password" above). 1. Open the app, enter the email above and tap "Email me a sign-in link". 2. On the next screen, type the password above in the "Sign-in code" field and tap "Sign in". The account owns a demo publication ("Field Notes", Pro plan) with posts, subscribers and stats. Demo subscribers use example.com addresses and are suppressed, so publishing never sends real email."
+  - Tick "full access including premium" (the demo publication is on Pro).
 - **Content rating:** questionnaire → *Utility, productivity, communication or other*; user-generated content: yes (users publish posts); no violence, sexual content, gambling, etc.
 - **Target audience:** 18+.
 - **News app:** No (users publish their own content; EdgeLetter isn't a news publisher).

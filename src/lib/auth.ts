@@ -1,4 +1,5 @@
 import type { AstroCookies } from 'astro';
+import { randomCode, randomToken, sha256 } from '@rubrion/core/crypto';
 import { and, desc, eq, gt, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   apiKeys,
@@ -25,17 +26,8 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const LOGIN_TOKEN_TTL_MS = 15 * 60 * 1000;
 export const INVITE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-const enc = new TextEncoder();
-
-export const sha256 = async (value: string): Promise<string> => {
-  const digest = await crypto.subtle.digest('SHA-256', enc.encode(value));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-};
-
-export const randomToken = (bytes = 32): string => {
-  const buf = crypto.getRandomValues(new Uint8Array(bytes));
-  return btoa(String.fromCharCode(...buf)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-};
+// Hashing and random secrets are shared through @rubrion/core.
+export { randomCode, randomToken, sha256 };
 
 export const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -156,9 +148,6 @@ export const consumeLoginToken = async (token: string) => {
 export const CODE_MAX_ATTEMPTS = 5;
 
 const codeHash = (tokenId: string, code: string) => sha256(`${tokenId}:${code}`);
-
-export const randomCode = (): string =>
-  String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0');
 
 /** Sign-in token plus its code; both are single-use and expire together. */
 export const issueSignIn = async (email: string): Promise<{ token: string; code: string }> => {

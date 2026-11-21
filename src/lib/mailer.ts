@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { senderName as safeSenderName, sendResend, type Mail } from '@rubrion/core/mail';
 
 /**
  * Single transactional email through Resend from the platform sender
@@ -19,40 +20,16 @@ export const mailFromDomain = (): string =>
  * their publication name, so strip characters that can fake an address or
  * header structure and cap the length; the address itself is always ours.
  */
-export const senderName = (name: string): string =>
-  name.replace(/[<>"@,;:\\\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'EdgeLetter';
+export const senderName = (name: string): string => safeSenderName(name, 'EdgeLetter');
 
 export const platformFrom = (name: string, local = 'posts'): string => `${senderName(name)} <${local}@${mailFromDomain()}>`;
 
-export type Mail = {
-  to: string;
-  subject: string;
-  html: string;
-  text: string;
-  from: string;
-  replyTo?: string;
-  headers?: Record<string, string>;
-};
+export type { Mail };
 
 export const sendMail = async (mail: Mail): Promise<void> => {
   if (import.meta.env.DEV) {
     console.log(`\n[mail:dev] to=${mail.to} subject="${mail.subject}"\n${mail.text}\n`);
     return;
   }
-  const key = (env as unknown as Env).RESEND_API_KEY;
-  if (!key) throw new Error('RESEND_API_KEY not configured');
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: mail.from,
-      to: mail.to,
-      subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
-      ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
-      ...(mail.headers ? { headers: mail.headers } : {}),
-    }),
-  });
-  if (!res.ok) throw new Error(`resend ${res.status}: ${await res.text()}`);
+  await sendResend((env as unknown as Env).RESEND_API_KEY, mail);
 };
